@@ -184,30 +184,32 @@ void AWeapon::EquipWeapon(class AWeapon* currentWeapon)
 		return;
 	}
 
-	//EquippedWeapon = currentWeapon;
+	/*
+		If weapon is already equipped, equip secondary weapon else equip primary weapon else if both
+		primary and secondary weapons are equipped then swap weapons
+	*/
 
+	// if no primary weapon is equipped, EquipSecondary
+	// if secondary weapon is equipped, EquipPrimary
+	// else swap weapon
 
-	if (CombatState != ECombatState::ECS_Unoccupied) return;
+    // If there's no primary weapon equipped, equip this one as primary.
+    if (!EquippedWeapon)
+    {
+        EquipPrimaryWeapon(currentWeapon);
+    }
+    // If the primary weapon is equipped and the secondary is not, and the current weapon is not the same as the primary weapon, equip as secondary.
+    else if (!SecondaryWeapon && EquippedWeapon != currentWeapon)
+    {
+        EquipSecondaryWeapon(currentWeapon);
+    }
+    // If both primary and secondary weapons are equipped, swap them.
+    else if (EquippedWeapon && SecondaryWeapon)
+    {
+        SwapWeapons();
+    }
 
-	// If no primary weapon is equipped, equip the current weapon as the primary weapon
-	if (EquippedWeapon == nullptr)
-	{
-		EquipPrimaryWeapon(currentWeapon);
-
-	}
-	// If a primary weapon is equipped and a secondary weapon is not, equip the current weapon as the secondary weapon
-	else if (SecondaryWeapon == nullptr && EquippedWeapon != currentWeapon)
-	{
-		EquipSecondaryWeapon(currentWeapon);
-	}
-	else
-	{
-		SwapWeapons();
-	}
 }
-
-
-
 
 void AWeapon::EquipPrimaryWeapon(class AWeapon* FirstWeapon)
 {
@@ -250,7 +252,7 @@ void AWeapon::EquipSecondaryWeapon(class AWeapon* SecondWeapon)
 // register for replicatrion
 void AWeapon::SwapWeapons()
 {
-
+	UE_LOG(LogTemp, Warning, (TEXT("SwapWeapons called")));
 	AWeapon* TempWeapon = EquippedWeapon;
 	EquippedWeapon = SecondaryWeapon;
 	SecondaryWeapon = TempWeapon;
@@ -262,6 +264,11 @@ void AWeapon::SwapWeapons()
 
 	AttachWeaponToWeaponSocket(SecondaryWeapon);
 
+}
+
+bool AWeapon::ShouldSwapWeapons() const
+{
+	return(EquippedWeapon != nullptr && SecondaryWeapon != nullptr);
 }
 
 void AWeapon::AttachActorToRightHand(AActor* ActorToAttach)
@@ -378,7 +385,7 @@ void AWeapon::Fire(const FVector& Hit)
 
 bool AWeapon::WeaponIsEmpty() const
 {
-    return AmmoOnHand <= 0;
+    return GetCurrentAmmoOnHand() == 0;
 }
 
 void AWeapon::RoundFired()
@@ -394,9 +401,13 @@ void AWeapon::RoundFired()
         RefreshHUD();
         UE_LOG(LogTemp, Warning, TEXT("RoundFired() ammo on hand = %d"), GetCurrentAmmoOnHand());
     } 
-    else 
+    else
     {
-        UE_LOG(LogTemp, Warning, TEXT("Weapon is out of ammo"));
+		// check if weapon is empty and log it
+		if(WeaponIsEmpty())
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Weapon is out of ammo"));
+		}
     }
 }
 
@@ -404,14 +415,17 @@ void AWeapon::RoundFired()
 If on client should then you should send RPC to server so 
 that the server knows to check to make sure 
 we can reload before informing clients they can 
-reload before its time to play reload animation
+reload before its time to play reload animation	
 */
 void AWeapon::Reload()
 {
+	UE_LOG(LogTemp, Warning, TEXT("Reload() function called"));
+
 	// Check if ammo is greater than 0 and Combat State is not reloading 
-	if(AmmoInMag > 0 && CombatState != ECombatState::ECS_Reloading) 
+	if(EquippedWeapon->AmmoInMag > 0) 
 	{
-		
+		UE_LOG(LogTemp, Warning, TEXT("Calling 2 reload functions"));
+
 		ServerReload();
 		FinishReloading(); 
 	}
@@ -435,39 +449,39 @@ void AWeapon::FinishReloading()
 
 void AWeapon::ServerReload_Implementation()
 {
+	UE_LOG(LogTemp, Warning, TEXT("Server Reload function called"));
+
 	// Check If MainCharacter or equipped weapon is nullptr
 	// Play Reload Montage
 	// Use FMath Clamp to make clamp ammo between 0 and value between ammo in Mag and Mag capacity
 	if(MainCharacter == nullptr || EquippedWeapon == nullptr) return;
 
-	int32 AmmoReload = AmmoToReload();
-	UE_LOG(LogTemp, Warning, TEXT("AmmoReload = %d"), AmmoReload);
-	UE_LOG(LogTemp, Warning, TEXT("Ammo In Mag = %d"), AmmoInMag);
+    CombatState = ECombatState::ECS_Reloading;
+    MainCharacter->PlayReloadMontage();
 
+    int32 AmmoReload = AmmoToReload(); // Calculate the ammo to reload
 
-	// Update the number of bullets on hand and in the magazine
-	// by subtracting the number of bullets being reloaded from
-	// the former and adding it to the latter
-	AmmoOnHand += AmmoReload;
-
-
-	CombatState = ECombatState::ECS_Reloading;
-	// if above is true set bReloading to true and expose to AnimBP
-	MainCharacter->PlayReloadMontage();
-
-
-	SetHUDAmmo(AmmoOnHand);
-	SetHUDMagAmmo(AmmoInMag);
+    // Use the GetCurrentAmmoOnHand and GetCurrentAmmoInMag methods to get the correct ammo values
+    // Use a new method or directly call a method on the EquippedWeapon to update its ammo counts
+    EquippedWeapon->ReloadAmmo(AmmoReload);
+	EquippedWeapon->RefreshHUD();
 }
 
 int32 AWeapon::AmmoToReload()
 {
-	// Check if EquippedWeapon is null ptr
-	if (EquippedWeapon == nullptr) 
+    if(EquippedWeapon == nullptr) 
     {
         return 0;
     }
-	return 0;
+
+    int32 CurrentAmmoOnHand = EquippedWeapon->GetCurrentAmmoOnHand();
+    int32 CurrentAmmoInMag = EquippedWeapon->GetCurrentAmmoInMag();
+    MaxAmmoOnHand = EquippedWeapon->GetMaxAmmoOnHand();
+
+    int32 MaxReloadAmount = MaxAmmoOnHand - CurrentAmmoOnHand;
+    int32 AmmoToReload = FMath::Min(MaxReloadAmount, CurrentAmmoInMag);
+
+    return AmmoToReload;
 }
 
 

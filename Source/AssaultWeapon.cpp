@@ -9,56 +9,65 @@
 
 void AAssaultWeapon::Fire(const FVector& HitTarget)
 {
+    Super::Fire(HitTarget); // Call the base class version of Fire
 
-    Super::Fire(HitTarget) ; // now when we call this function on projectile the base class version of fire will be called
+    // Cast the owner to a pawn - the character firing the weapon is the owner of the projectile
+    APawn* InstigatorPawn = Cast<APawn>(GetOwner());
 
-    //spawn projectile at tip of barrel - first get "owner" of class or weapon
-    APawn* InstigatorPawn = Cast<APawn>(GetOwner()); // castin owner to pawn - character firing weapon is "owner" of projectile
-
-    /*Spawn projectile at "MuzzleFlash" socket on weapon 
-    create variable that is reference of type USkeletalMeshSocket
-    Use GetWeaponMesh getter from weapon.cpp*/
+    // Spawn the projectile at the "MuzzleFlash" socket on the weapon
     const USkeletalMeshSocket* MuzzleFlashSocket = GetWeaponMesh()->GetSocketByName(FName("MuzzleFlash")); 
 
-
     UE_LOG(LogTemp, Warning, TEXT("HitTarget: %s"), *HitTarget.ToString());
-    if (MuzzleFlashSocket && !WeaponIsEmpty())
+
+    // Check if the socket is valid and the weapon is not empty
+    if(MuzzleFlashSocket && !WeaponIsEmpty())
     {
         SocketTransform = MuzzleFlashSocket->GetSocketTransform(GetWeaponMesh());
+        FVector Start = SocketTransform.GetLocation();
+        FVector End = Start + (HitTarget - Start) * 1.25;
+
         
-        if (MuzzleFlash)
+		FHitResult FireHit;
+		WeaponTraceHit(Start, HitTarget, FireHit);
+
+        if(ImpactParticles)
         {
-            UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), MuzzleFlash, SocketTransform);
+            UGameplayStatics::SpawnEmitterAtLocation(GetWorld(),
+            ImpactParticles, FireHit.ImpactPoint, FireHit.ImpactNormal.Rotation());
         }
+	}   
+}
 
-        FVector TraceStart = SocketTransform.GetLocation();
-        FVector TraceEnd = TraceStart + (HitTarget - TraceStart) * 1.25; // Define TraceRange as a float representing the max trace distance
-
-        FHitResult FireHit;
-        FCollisionQueryParams TraceParams(FName(TEXT("FireTrace")), true, InstigatorPawn);
-        TraceParams.bTraceComplex = true;
-        TraceParams.bReturnPhysicalMaterial = false;
-
-        UWorld* World = GetWorld();
-        if (World->LineTraceSingleByChannel(FireHit, TraceStart, TraceEnd, ECC_Visibility, TraceParams))
+void AAssaultWeapon::WeaponTraceHit(const FVector& TraceStart, const FVector& HitTarget, FHitResult& FireHit)
+{
+    UWorld* World = GetWorld();
+     if(World)
         {
-            AEnemyCharacter* HitEnemy = Cast<AEnemyCharacter>(FireHit.GetActor());
-            if (HitEnemy)
+            FVector End = TraceStart + (HitTarget - TraceStart) * 1.25f;
+
+            World->LineTraceSingleByChannel(FireHit, 
+            TraceStart, 
+            End, 
+            ECollisionChannel::ECC_Visibility);
+
+            FVector BeamEnd = End;
+
+            if(FireHit.bBlockingHit)
             {
-                HitEnemy->EnemyDamage(GetDamage());
+                BeamEnd = FireHit.ImpactPoint;
+
+                // First, check if the hit actor is an enemy
+                AEnemyCharacter* HitEnemy = Cast<AEnemyCharacter>(FireHit.GetActor());
+                if (HitEnemy)
+                {
+                    HitEnemy->EnemyDamage(GetDamage());
+                }
+            }
+            else
+            {
+                FireHit.ImpactPoint = End;
             }
         }
-
-        if (Projectile)
-        {
-            FActorSpawnParameters SpawnParams;
-            SpawnParams.Owner = GetOwner();
-            SpawnParams.Instigator = InstigatorPawn;
-            
-            World->SpawnActor<AProjectile>(Projectile, SocketTransform.GetLocation(), SocketTransform.GetRotation().Rotator(), SpawnParams);
-        }
-    }
-
 }
 void AAssaultWeapon::SetAmmo(int32 NewAmmoOnHand, int32 NewAmmoInMag)
 {
@@ -91,7 +100,8 @@ int32 AAssaultWeapon::GetMagCapacity() const
 
 void AAssaultWeapon::ReloadAmmo(int32 AmmoAmount) 
 {
-// Update the AssaultWeapon-specific ammo counts
+    UE_LOG(LogTemp, Warning, TEXT("Assault Weapon reload function called"));
+    // Update the AssaultWeapon-specific ammo counts
     AssaultWeaponAmmoOnHand += AmmoAmount;
     AssaultWeaponAmmoInMag -= AmmoAmount;
 

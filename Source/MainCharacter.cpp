@@ -175,11 +175,15 @@ void AMainCharacter::LookUp(float value)
 
 void AMainCharacter::SetOverlappingWeapon(AWeapon* Weapon)
 {
+	// if you overlap another weapon and myWeapon is valid, i.e weapon is already equipped then dont
+	// set myWeapon just yet
 	if(OverlappingWeapon) // OverlappingWeapon is pointer to AWeapon declared in header file
 	{
 		OverlappingWeapon->ShowPickUpWidget(false);
 	}
+
 	OverlappingWeapon = Weapon; // assigning the value of pointer passed into function to OverlappingWeapon
+
 	if (IsLocallyControlled())
 	{
 		if(OverlappingWeapon)
@@ -187,6 +191,7 @@ void AMainCharacter::SetOverlappingWeapon(AWeapon* Weapon)
 			OverlappingWeapon->ShowPickUpWidget(true);
 		}
 	}
+
 }
 
 void AMainCharacter::OnRep_OverlappingWeapon(AWeapon* LastWeapon)
@@ -233,13 +238,22 @@ bool AMainCharacter::IsWeaponEquipped()
 
 void AMainCharacter::EquipButtonPressed()
 {
-	if(OverlappingWeapon == nullptr) return;
-
-	if(myWeapon && HasAuthority())
+	
+	if(OverlappingWeapon)
 	{
-		myWeapon->EquipWeapon(OverlappingWeapon);
+		if(myWeapon && HasAuthority())
+		{
+			myWeapon->EquipWeapon(OverlappingWeapon);
+		}
+
+	}
+
+	else if (myWeapon->ShouldSwapWeapons())
+	{
+		myWeapon->SwapWeapons();
 	}
 }
+
 
 void AMainCharacter::PickUpButtonPressed()
 {
@@ -299,6 +313,7 @@ void AMainCharacter::ReloadButtonPressed()
 {
 	if(myWeapon)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("myWeapon is valid"));
 		myWeapon->Reload();
 	}
 	

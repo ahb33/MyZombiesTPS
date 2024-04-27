@@ -93,6 +93,8 @@ public:
 	// function will return true if weapon is empty and will not fire
 	bool WeaponIsEmpty() const;
 
+	bool ShouldSwapWeapons() const;
+
 
 	void FireButtonPressed(bool bFire); // declaring this function as virtual so that child classes can override it
 

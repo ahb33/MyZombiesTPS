@@ -25,7 +25,7 @@ void AShotgun::Fire(const FVector& HitTarget)
     // Check if the socket is valid and the weapon is not empty
     if(MuzzleFlashSocket && !WeaponIsEmpty())
     {
-        FTransform SocketTransform = MuzzleFlashSocket->GetSocketTransform(GetWeaponMesh());
+        SocketTransform = MuzzleFlashSocket->GetSocketTransform(GetWeaponMesh());
         FVector Start = SocketTransform.GetLocation();
         FVector End = Start + (HitTarget - Start) * 1.25;
 
@@ -113,6 +113,7 @@ int32 AShotgun::GetMagCapacity() const
 void AShotgun::ReloadAmmo(int32 AmmoAmount) 
 {
 // Update the Shotgun-specific ammo counts
+
     ShotgunAmmoOnHand += AmmoAmount;
     ShotgunAmmoInMag -= AmmoAmount;
 

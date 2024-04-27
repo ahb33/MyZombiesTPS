@@ -56,6 +56,14 @@ private:
 
 	FTransform SocketTransform;
 
+	UPROPERTY(EditAnywhere)
+	class UParticleSystem* ImpactParticles; // particles will be spawned if we get blocking hit
+
+	UPROPERTY(EditAnywhere)
+	float Damage;
+
+
+
 
 
 	

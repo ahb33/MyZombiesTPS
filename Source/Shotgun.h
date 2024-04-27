@@ -48,7 +48,7 @@ private:
 	class AMainCharacter* PlayerCharacter;
 	
 	UPROPERTY(EditAnywhere)
-	float Damage = 40.f;
+	float Damage;
 
 	UPROPERTY(EditAnywhere)
 	class UParticleSystem* ImpactParticles; // particles will be spawned if we get blocking hit
@@ -64,5 +64,8 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	int32 ShotgunMagCapacity; // 
+
+	FTransform SocketTransform;
+
 
 };
