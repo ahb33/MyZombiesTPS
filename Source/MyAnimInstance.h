@@ -6,7 +6,8 @@
 #include "Animation/AnimInstance.h"
 #include "MainCharacter.h"
 #include "TurnInPlace.h"
-#include "MyZombies/CombatState.h"
+#include "Weapon.h"
+#include "CombatState.h"
 #include "MyAnimInstance.generated.h"
 
 /**
@@ -17,7 +18,6 @@ class MYZOMBIES_API UMyAnimInstance : public UAnimInstance
 {
 	GENERATED_BODY()
 
-
 public:
 
 	virtual void NativeInitializeAnimation() override; // this function is called once at the beginning of the game
@@ -25,10 +25,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = Animation)
 	virtual void NativeUpdateAnimation(float DeltaTime) override;
 
+	void UpdateMovementProperties();
+	void UpdateCharacterProperties(float);
+	void UpdateWeaponProperties();
 
 
-	// UFUNCTION(BlueprintCallable, Category = Animation)
-	// void UpdateAnimationProperties(float DeltaTime) override;
 
 private: 
 
@@ -53,6 +54,10 @@ private:
 
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = Animation, meta = (AllowPrivateAccess = "true"))
 	bool bAiming;
+
+	UPROPERTY(BlueprintReadOnly, Category = Animation, meta = (AllowPrivateAccess = "true"))
+	bool bIsPlayerReloading;
+
 
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = Animation, meta = (AllowPrivateAccess = "true"))
 	bool bFireWeapon;
@@ -90,9 +95,6 @@ private:
 
 	UPROPERTY(BlueprintReadOnly, Category = Animation, meta = (AllowPrivateAccess = "true"))
 	bool bUseFABRIK;
-
-	UPROPERTY(BlueprintReadOnly, Category = Animation, meta = (AllowPrivateAccess = "true"))
-	bool bReloading;
 
 
 };

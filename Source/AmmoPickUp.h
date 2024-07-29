@@ -16,6 +16,10 @@ class MYZOMBIES_API AAmmoPickUp : public APickUp
 	GENERATED_BODY()
 
 
+public:
+
+	EWeaponType GetWeaponType() const {return WeaponType;}
+
 
 
 protected: 
@@ -32,18 +36,12 @@ private:
 
 	class AWeapon* myWeapon;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Weapon, meta = (AllowPrivateAccess = "true"))
 	EWeaponType WeaponType;
 
-	UPROPERTY(EditAnywhere)
-	int32 AmmoAmount = 30;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Weapon, meta = (AllowPrivateAccess = "true"))
+	int32 AmmoAmount;
+
+	int32 GetAmmoAmountForWeaponType( );
 };
 
-
-/*
-Create pointer to Weapon class
-Create and construct variable that is pointer to MainCharacter and cast OtherActor from Sphere begin overlap
-Check if MainCharacter is valid
-
-
-
-*/

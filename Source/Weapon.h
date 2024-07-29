@@ -13,10 +13,14 @@
 #include "WeaponTypes.h"
 #include "CombatState.h"
 #include "WeaponState.h"
+#include "Delegates/DelegateCombinations.h"
 #include "Casing.h"
 #include "Weapon.generated.h"
 
 #define Trace_Length 10000.f
+
+
+
 
 UCLASS()
 class MYZOMBIES_API AWeapon : public AActor
@@ -134,6 +138,8 @@ public:
 
 	virtual void ReloadAmmo(int32 Ammo) {};
 
+	virtual void AddAmmoPickUp(int32 AmmoAdd) {};
+
 	virtual float GetDamage() const {return 20.f;}
 
 	// This function will initialize ammo for all weapon types
@@ -153,22 +159,23 @@ public:
 
 	EWeaponType GetWeaponType() const {return WeaponType;}
 
-
 	void DropWeapon();
 
+	void SetCombatState(ECombatState NewState);
 
 	UFUNCTION()
 	void OnRep_CombatState();
 
-	ECombatState SetCombatState();
-
 	// function will return combat state
 	ECombatState GetCombatState(){return CombatState;} 
+
+
 
 	UFUNCTION()
 	void OnRep_WeaponState();
 
 	void SetWeaponState(EWeaponState WeaponState); // Create function to SetWeaponState
+
 
 	EWeaponState GetWeaponState(){return WeaponState;}
 
@@ -227,6 +234,10 @@ private:
 	UPROPERTY(Replicated)
 	bool bAiming;
 
+	bool bReloading;
+
+    FTimerHandle ReloadTimerHandle;
+
 	bool bFireButtonPressed;
 
 	bool bCanFire = true;
@@ -275,11 +286,9 @@ private:
 	UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_AmmoOnHand)
 	int32 MaxAmmoOnHand; 
 
-
 	// Amount that can be reloaded
 	UPROPERTY(ReplicatedUsing = OnRep_AmmoOnHand)
 	int32 ReloadAmount; 
-
 
 	// Ammo in mag for currently equipped weapon
 	UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_AmmoInMag)

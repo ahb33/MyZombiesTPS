@@ -52,8 +52,6 @@ private:
 	UPROPERTY(EditAnywhere)
 	float CrosshairSpreadMax = 20.f;
 
-
-
 protected:
 
 	virtual void BeginPlay() override;

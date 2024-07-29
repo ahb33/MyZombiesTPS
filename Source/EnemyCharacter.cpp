@@ -2,6 +2,7 @@
 
 
 #include "EnemyCharacter.h"
+#include "MyZombiesGameMode.h"
 
 
 // Sets default values
@@ -53,13 +54,18 @@ void AEnemyCharacter::EnemyDamage(float Damage)
             AnimInstanceRef->SetIsDead(true);
         }
         // Set a timer to destroy the zombie after a delay
-        GetWorld()->GetTimerManager().SetTimer(DestructionTimer, this, &AEnemyCharacter::DestroyZombie, 1.0f, false);
+        GetWorld()->GetTimerManager().SetTimer(DestructionTimer, this, &AEnemyCharacter::Die, 1.0f, false);
     }
 }
 
 
-void AEnemyCharacter::DestroyZombie()
+void AEnemyCharacter::Die()
 {
-	Destroy();
+    Destroy();
+	myGameMode = GetWorld()->GetAuthGameMode<AMyZombiesGameMode>();
+    if (myGameMode)
+    {
+        myGameMode->CheckEnemiesAlive();
+    }
 }
 

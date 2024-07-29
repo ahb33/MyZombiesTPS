@@ -123,6 +123,11 @@ void AShotgun::ReloadAmmo(int32 AmmoAmount)
 
 }
 
+void AShotgun::AddAmmoPickUp(int32 AmmoAdd)
+{
+
+}
+
 float AShotgun::GetDamage() const
 {
     return 45.f;

@@ -8,7 +8,6 @@
 #include "TurnInPlace.h"
 #include "CombatState.h"
 #include "HealthPickUp.h"
-#include "MyZombies/CombatState.h"
 #include "AmmoPickUp.h"
 #include "MyPlayerController.h"
 #include "MainCharacter.generated.h"
@@ -39,11 +38,14 @@ public:
 	bool IsWeaponEquipped();
 	bool IsAiming();
 
+	bool IsReloading();
+
+	float GetReloadDuration();
+
 	void PlayFireMontage(bool bAiming);
 
 	void PlayReloadMontage();
 	
-
 	AWeapon* GetEquippedWeapon();
 
 	UFUNCTION()
@@ -61,12 +63,9 @@ public:
 	UFUNCTION()
 	void OnRep_Health();
 
-	ECombatState GetCombatState() const;
-
 	FVector GetHitTarget() const;
 
 	void PickUpButtonPressed();
-	
 
 protected:
 	// Called when the game starts or when spawned
@@ -102,12 +101,8 @@ private:
 
 	class AMyHUD* MyGameHUD;
 
-
-
 	UPROPERTY(ReplicatedUsing = OnRep_OverlappingWeapon)
 	class AWeapon* OverlappingWeapon; // we have to override a function
-
-
 
 	UPROPERTY(EditAnywhere, Category = Combat)
 	class UAnimMontage* FireMontage;
@@ -135,5 +130,6 @@ private:
 	float MAXHealth = 100.f;
 
 	float InterpAO_Yaw;
+
 
 };		

@@ -38,6 +38,8 @@ public:
 
 	virtual void ReloadAmmo(int32 Ammo) override;
 
+	virtual void AddAmmoPickUp(int32 AmmoAdd) override;
+
 	virtual float GetDamage() const override;
 
 

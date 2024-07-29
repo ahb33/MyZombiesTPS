@@ -81,8 +81,6 @@ void AMainCharacter::BeginPlay()
 
 	// pickUpHealth = Cast<AHealthPickUp>(UGameplayStatics::GetActorOfClass(this, AHealthPickUp::StaticClass()));
 
-
-
 }
 
 
@@ -122,6 +120,8 @@ void AMainCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 
 	DOREPLIFETIME_CONDITION(AMainCharacter, OverlappingWeapon, COND_OwnerOnly);
 	DOREPLIFETIME(AMainCharacter, PlayerHealth);
+
+
 }
 
 // Called every frame
@@ -272,24 +272,6 @@ void AMainCharacter::PickUpButtonPressed()
 
 }
 
-void AMainCharacter::AimButtonPressed()
-{
-	if(myWeapon)
-	{
-		myWeapon->SetAiming(true);
-	}
-	
-}
-
-
-void AMainCharacter::AimButtonReleased()
-{
-	if(myWeapon)
-	{
-		myWeapon->SetAiming(false);
-	}
-	
-}
 
 void AMainCharacter::FireButtonPressed()
 {
@@ -311,20 +293,51 @@ void AMainCharacter::FireButtonReleased()
 
 void AMainCharacter::ReloadButtonPressed()
 {
-	if(myWeapon)
+	if(!myWeapon)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("No Weapon is equipped"));
+		return;
+	}
+
+	else 
 	{
 		UE_LOG(LogTemp, Warning, TEXT("myWeapon is valid"));
 		myWeapon->Reload();
 	}
-	
+
+
+}
+
+void AMainCharacter::AimButtonPressed()
+{	
+	if(myWeapon)
+	{
+		myWeapon->SetAiming(true);
+	}	
 }
 
 
+void AMainCharacter::AimButtonReleased()
+{
+	if(myWeapon)
+	{
+		myWeapon->SetAiming(false);
+	}	
+}
 
 bool AMainCharacter::IsAiming()
 {
 	return (myWeapon && myWeapon->bAiming);
 }
+
+bool AMainCharacter::IsReloading()
+{
+	bool reloading = (myWeapon && myWeapon->bReloading);
+    UE_LOG(LogTemp, Warning, TEXT("IsReloading() called, bReloading = %s"), reloading ? TEXT("true") : TEXT("false"));
+    return reloading;
+
+}
+
 
 void AMainCharacter::PlayFireMontage(bool bAiming)
 {
@@ -383,6 +396,18 @@ void AMainCharacter::PlayReloadMontage()
 		AnimInstance->Montage_JumpToSection(SectionName);
 	}
 }
+
+
+float AMainCharacter::GetReloadDuration()
+{
+    if (ReloadMontage)
+    {
+        // Return the duration of the reload montage
+        return ReloadMontage->GetPlayLength();
+    }
+    return 0.0f;
+}
+
 
 AWeapon *AMainCharacter::GetEquippedWeapon()
 {
@@ -474,15 +499,6 @@ void AMainCharacter::OnRep_Health()
 
 }
 
-ECombatState AMainCharacter::GetCombatState() const
-{
-    if (myWeapon == nullptr)
-    {
-        return ECombatState::ECS_Unoccupied;
-    }
-    return myWeapon->CombatState;
-
-}
 
 FVector AMainCharacter::GetHitTarget() const
 {

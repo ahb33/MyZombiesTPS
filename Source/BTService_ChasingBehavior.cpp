@@ -28,38 +28,47 @@ UBTService_ChasingBehavior::UBTService_ChasingBehavior(const FObjectInitializer&
 
 void UBTService_ChasingBehavior::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
 {
-     Super::TickNode(OwnerComp, NodeMemory, DeltaSeconds);
+    Super::TickNode(OwnerComp, NodeMemory, DeltaSeconds);
 
-     GetStaticDescription();
+    GetStaticDescription();
 
-     UBlackboardComponent* BlackboardComp = OwnerComp.GetBlackboardComponent();
-     if (BlackboardComp == nullptr) return;
+    UBlackboardComponent* BlackboardComp = OwnerComp.GetBlackboardComponent();
+    if (BlackboardComp == nullptr) return;
 
-     // Get the AI controller from OwnerComp and check whether it is valid
-     AAIController* AIController = OwnerComp.GetAIOwner();
-     if (AIController == nullptr) return;
+    // Get the AI controller from OwnerComp and check whether it is valid
+    AAIController* AIController = OwnerComp.GetAIOwner();
+    if (AIController == nullptr) return;
          
-     // cast our AI controller to our custom AI controller
-     AMyAIController* ZombieAI = Cast<AMyAIController>(AIController);
-     if (ZombieAI == nullptr) return;
+    // cast our AI controller to our custom AI controller
+    AMyAIController* ZombieAI = Cast<AMyAIController>(AIController);
+    if (ZombieAI == nullptr) return;
 
-     // Retrieve the player's location from the blackboard
-     FVector PlayerLocation = BlackboardComp->GetValueAsVector("PlayerLocation");
+    // Retrieve the player's location from the blackboard
+    FVector PlayerLocation = BlackboardComp->GetValueAsVector("PlayerLocation");
 
-     // Retrieve CanSeePlayer value from blckboard
-     bool bCanSeePlayer = BlackboardComp->GetValueAsBool(CanSeePlayerKey.SelectedKeyName);
-
+    // Retrieve CanSeePlayer value from blckboard
+    bool bCanSeePlayer = BlackboardComp->GetValueAsBool("CanSeePlayer"); // Make sure the key string matches
+    UE_LOG(LogTemp, Warning, TEXT("bCanSeePlayer retrieved as %s"), bCanSeePlayer ? TEXT("true") : TEXT("false"));
+    
     // Retrieve CanHearPlayer value from blckboard
-     bool bCanHearPlayer = BlackboardComp->GetValueAsBool(CanHearPlayerKey.SelectedKeyName);
+    bool bCanHearPlayer = BlackboardComp->GetValueAsBool(CanHearPlayerKey.SelectedKeyName);
 
-     if (bCanSeePlayer || bCanHearPlayer)
-     {
-         // Update the player's last known position only if the AI currently sees the player.
-         FVector CurrentPlayerLocation = BlackboardComp->GetValueAsVector(PlayerKey.SelectedKeyName);
-         BlackboardComp->SetValueAsVector(LastKnownPositionKey.SelectedKeyName, CurrentPlayerLocation);
-     }
+    // Update the last known player position based on the current perception
+    if (bCanSeePlayer || bCanHearPlayer)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("bCanSeePlayer is valid"));
+        FVector CurrentPlayerLocation = BlackboardComp->GetValueAsVector(PlayerKey.SelectedKeyName);
+        BlackboardComp->SetValueAsVector(LastKnownPositionKey.SelectedKeyName, CurrentPlayerLocation);
+    }
 
-     bLastCanSeePlayer = bCanSeePlayer;
+    // Check if the visibility of the player has changed
+    if (bCanSeePlayer != bLastCanSeePlayer)
+    {
+        // Potentially handle changes in visibility state here
+    }
+
+
+    bLastCanSeePlayer = bCanSeePlayer;
     
 }
 
@@ -68,8 +77,8 @@ void UBTService_ChasingBehavior::TickNode(UBehaviorTreeComponent& OwnerComp, uin
 void UBTService_ChasingBehavior::OnBecomeRelevant(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
     Super::OnBecomeRelevant(OwnerComp, NodeMemory);
-    // Get reference to the player so that we can store it on the blackboard
 
+    // Get reference to the player so that we can store it on the blackboard
     UBlackboardComponent* BlackboardComp = OwnerComp.GetBlackboardComponent();
     if (BlackboardComp)
     {
@@ -104,7 +113,9 @@ FString UBTService_ChasingBehavior::GetStaticDescription() const
         TEXT("Player Class"), PlayerClass ? *PlayerClass->GetName() : TEXT("None"),
         TEXT("PlayerKey"), PlayerKey.IsSet() ? *PlayerKey.SelectedKeyName.ToString() : TEXT("None"),
         TEXT("LastKnownPositionKey"), LastKnownPositionKey.IsSet() ? *LastKnownPositionKey.SelectedKeyName.ToString() : TEXT("None"),
-        TEXT("CanSeePlayerKey"), CanSeePlayerKey.IsSet() ? *CanSeePlayerKey.SelectedKeyName.ToString() : TEXT("None")
+        TEXT("CanSeePlayerKey"), CanSeePlayerKey.IsSet() ? *CanSeePlayerKey.SelectedKeyName.ToString() : TEXT("None"),
+        TEXT("CanHearPlayerKey"), CanHearPlayerKey.IsSet() ? *CanHearPlayerKey.SelectedKeyName.ToString() : TEXT("None")
+
     );
 
 }

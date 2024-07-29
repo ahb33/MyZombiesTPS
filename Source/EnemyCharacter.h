@@ -31,7 +31,7 @@ public:
 
 	void EnemyDamage(float Damage);
 
-	void DestroyZombie();
+	void Die();
 
 protected:
 	// Called when the game starts or when spawned
@@ -45,5 +45,7 @@ private:
 	UAI_AnimInstance* AnimInstanceRef;
 
 	FTimerHandle DestructionTimer; // Timer handle for delayed destruction
+
+	class AMyZombiesGameMode* myGameMode;
 
 };

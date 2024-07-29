@@ -4,6 +4,9 @@
 #include "AI_AnimInstance.h"
 #include "GameFramework/CharacterMovementComponent.h" 
 #include "EnemyCharacter.h"
+#include "BTService_ChasingBehavior.h"
+#include "BehaviorTree/BehaviorTree.h"
+#include "BehaviorTree/BlackboardComponent.h"
 #include "MyAIController.h"
 
 
@@ -53,6 +56,18 @@ void UAI_AnimInstance::NativeUpdateAnimation(float DeltaTime)
 
         // UE_LOG(LogTemp, Warning, TEXT("Movement Speed: %f"), MovementSpeed);
 
+        // Access the AI controller and its blackboard component
+        AAIController* AIController = Cast<AAIController>(Pawn->GetController());
+        if (AIController)
+        {
+            UBlackboardComponent* BlackboardComp = AIController->GetBlackboardComponent();
+            if (BlackboardComp)
+            {
+                // Check player visibility status from the blackboard
+                bool bCanSeePlayer = BlackboardComp->GetValueAsBool("CanSeePlayer");  // Ensure the key name matches what is used in the Behavior Tree
+                SetPlayerVisibility(bCanSeePlayer);
+            }
+        }
 
     }
 }

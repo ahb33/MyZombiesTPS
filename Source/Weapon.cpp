@@ -14,6 +14,7 @@
 #include "Components/WidgetComponent.h"
 
 
+
 // Sets default values
 AWeapon::AWeapon()
 {
@@ -41,6 +42,7 @@ AWeapon::AWeapon()
 	PickupWidget->SetupAttachment(RootComponent);
 
 
+
 }
 
 void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -48,6 +50,8 @@ void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(AWeapon, bAiming);
+
+
 
 	/*We'd like ammo on hand and the ammo in the magazine to be replicated on all clients in case one player picked up a used weapon
 	  then you want the ammo count on that weapon to remain unchanged
@@ -150,23 +154,6 @@ void AWeapon::OnSphereEndOverlap(UPrimitiveComponent* OverlappedComponent, AActo
 
 }
 
-void AWeapon::ShowPickUpWidget(bool bShowWidget)
-{
-	if(PickupWidget)
-	{
-		PickupWidget->SetVisibility(bShowWidget);
-	}
-}
-void AWeapon::SetAiming(bool bIsAiming)
-{
-	bAiming = bIsAiming; 
-	ServerSetAiming(bIsAiming);
-}
-
-void AWeapon::ServerSetAiming_Implementation(bool bIsAiming)
-{
-	bAiming = bIsAiming;
-}
 
 // void AWeapon::OnRep_Aiming()
 // {
@@ -417,38 +404,51 @@ that the server knows to check to make sure
 we can reload before informing clients they can 
 reload before its time to play reload animation	
 */
-void AWeapon::Reload()
+
+void AWeapon::ShowPickUpWidget(bool bShowWidget)
 {
-	UE_LOG(LogTemp, Warning, TEXT("Reload() function called"));
-
-	// Check if ammo is greater than 0 and Combat State is not reloading 
-	if(EquippedWeapon->AmmoInMag > 0) 
+	if(PickupWidget)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Calling 2 reload functions"));
-
-		ServerReload();
-		FinishReloading(); 
+		PickupWidget->SetVisibility(bShowWidget);
 	}
 }
 
-// not done yet
-void AWeapon::FinishReloading()
+void AWeapon::SetAiming(bool bIsAiming)
 {
-	if(MainCharacter == nullptr) return;
-	if(MainCharacter->HasAuthority())
+	if (HasAuthority())
 	{
-		// Reset combat state to allow reloading again
-		CombatState = ECombatState::ECS_Unoccupied;
+		// We are on the server, so just set the value
+		ServerSetAiming(bIsAiming);
 	}
-	if (bFireButtonPressed)
+	else
 	{
-		bool bFire = true;
-		FireButtonPressed(bFire);
+		// We are on the client, so request the server to set the value
+		ServerSetAiming(bIsAiming);
+	}
+}
+
+
+void AWeapon::ServerSetAiming_Implementation(bool bIsAiming)
+{
+	bAiming = bIsAiming;
+}
+
+void AWeapon::Reload()
+{
+
+	UE_LOG(LogTemp, Warning, TEXT("Reload() function called"));
+	
+	// Check if ammo is greater than 0 and Combat State is not reloading 
+	if(EquippedWeapon && EquippedWeapon->AmmoInMag > 0) 
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Calling 2 reload functions"));
+		ServerReload();
 	}
 }
 
 void AWeapon::ServerReload_Implementation()
 {
+
 	UE_LOG(LogTemp, Warning, TEXT("Server Reload function called"));
 
 	// Check If MainCharacter or equipped weapon is nullptr
@@ -457,6 +457,7 @@ void AWeapon::ServerReload_Implementation()
 	if(MainCharacter == nullptr || EquippedWeapon == nullptr) return;
 
     CombatState = ECombatState::ECS_Reloading;
+
     MainCharacter->PlayReloadMontage();
 
     int32 AmmoReload = AmmoToReload(); // Calculate the ammo to reload
@@ -465,7 +466,40 @@ void AWeapon::ServerReload_Implementation()
     // Use a new method or directly call a method on the EquippedWeapon to update its ammo counts
     EquippedWeapon->ReloadAmmo(AmmoReload);
 	EquippedWeapon->RefreshHUD();
+	bReloading = true;
+	
+	UE_LOG(LogTemp, Warning, TEXT("bReloading set to true in ServerReload"));
+
+	
+    // Set a timer to call FinishReloading after the duration of the reload animation
+    float ReloadDuration = MainCharacter->GetReloadDuration(); // Make sure this function is implemented to get the duration of the reload montage
+    GetWorld()->GetTimerManager().SetTimer(ReloadTimerHandle, this, &AWeapon::FinishReloading, ReloadDuration, false);
 }
+
+void AWeapon::FinishReloading()
+{
+    UE_LOG(LogTemp, Warning, TEXT("FinishReloading() function called"));
+    if (MainCharacter == nullptr) 
+    {
+        UE_LOG(LogTemp, Warning, TEXT("MainCharacter is nullptr"));
+        return;
+    }
+    if (MainCharacter->HasAuthority())
+    {
+        CombatState = ECombatState::ECS_Unoccupied;
+        UE_LOG(LogTemp, Warning, TEXT("CombatState set to ECS_Unoccupied"));
+    }
+    if (bFireButtonPressed)
+    {
+        bool bFire = true;
+        FireButtonPressed(bFire);
+        UE_LOG(LogTemp, Warning, TEXT("FireButtonPressed called with bFire = true"));
+    }
+
+	bReloading = false;
+	UE_LOG(LogTemp, Warning, TEXT("bReloading set to false in FinishReloading"));
+}
+
 
 int32 AWeapon::AmmoToReload()
 {
@@ -485,9 +519,28 @@ int32 AWeapon::AmmoToReload()
 }
 
 
-void AWeapon::PickUpAmmo(EWeaponType PickupType, int32 AmmoAmount)
+void AWeapon::PickUpAmmo(EWeaponType PickupType, int32 AmmoPickupAmount)
 {
 	UE_LOG(LogTemp, Warning, TEXT("PickUpAmmo function called"));
+	
+	/*
+		if Ammo to be added into magazine exceedes max ammo on hand load remaining into magazine
+		if remaining amount exceedes MagCapacity - CurrentAmmoInMag then discard
+		
+	*/
+
+    int32 CurrentAmmoOnHand = EquippedWeapon->GetCurrentAmmoOnHand();
+    int32 CurrentAmmoInMag = EquippedWeapon->GetCurrentAmmoInMag();
+    MaxAmmoOnHand = EquippedWeapon->GetMaxAmmoOnHand();
+    int32 MaxMagCapacity = EquippedWeapon->GetMagCapacity();
+
+    // Calculate the new ammo amount on hand
+    int32 NewAmmoOnHand = CurrentAmmoOnHand + AmmoPickupAmount;
+
+	AddAmmoPickUp(NewAmmoOnHand);
+
+	// after value are set refresh HUD- change return type of AddAmmoPickUp - set new variable to accept
+	// return and then refresh HUD values
 
 }
 
@@ -584,6 +637,14 @@ void AWeapon::OnRep_SecondaryWeapon()
 	
 }
 
+
+void AWeapon::SetCombatState(ECombatState NewState)
+{
+	CombatState = NewState;
+	OnRep_CombatState();
+
+}
+
 void AWeapon::OnRep_CombatState()
 {
 	switch (CombatState)
@@ -602,14 +663,14 @@ void AWeapon::OnRep_CombatState()
 	}
 }
 
-void AWeapon::OnRep_WeaponState()
-{
-
-}
-
 void AWeapon::SetWeaponState(EWeaponState State)
 {
 	WeaponState = State;
+    OnRep_WeaponState();
+
+}
+void AWeapon::OnRep_WeaponState()
+{
 
 	switch(WeaponState)
 	{
@@ -645,7 +706,6 @@ void AWeapon::SetWeaponState(EWeaponState State)
 		//	break;
 
 	}
-
 }
 
 FVector AWeapon::CrossHairTrace(FHitResult& TraceHitResult)
@@ -656,14 +716,15 @@ FVector AWeapon::CrossHairTrace(FHitResult& TraceHitResult)
 	{
 		GEngine->GameViewport->GetViewportSize(ViewportSize);
 	}
-		FVector2D CrosshairLocation(ViewportSize.X / 2.f, ViewportSize.Y / 2.f);
-		FVector CrosshairWorldPosition;
-		FVector CrosshairWorldDirection;
+		
+	FVector2D CrosshairLocation(ViewportSize.X / 2.f, ViewportSize.Y / 2.f);
+	FVector CrosshairWorldPosition;
+	FVector CrosshairWorldDirection;
 
-		bool bScreenToWorld = UGameplayStatics::DeprojectScreenToWorld(
+	bool bScreenToWorld = UGameplayStatics::DeprojectScreenToWorld(
 		UGameplayStatics::GetPlayerController(this, 0), CrosshairLocation, CrosshairWorldPosition,
 		CrosshairWorldDirection
-		);
+	);
 
 	if (bScreenToWorld)
 	{	

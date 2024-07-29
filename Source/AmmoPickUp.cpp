@@ -24,7 +24,7 @@ void AAmmoPickUp::OnSphereBeginOverlap(UPrimitiveComponent* OverlappedComponent,
         if (myWeapon)
         {
             
-            myWeapon->PickUpAmmo(WeaponType, AmmoAmount);
+            // myWeapon->PickUpAmmo(WeaponType, AmmoAmount);
         }
 
     }
@@ -33,3 +33,15 @@ void AAmmoPickUp::OnSphereBeginOverlap(UPrimitiveComponent* OverlappedComponent,
 
 }
 
+int32 AAmmoPickUp::GetAmmoAmountForWeaponType( )
+{
+	switch (WeaponType)
+	{
+	case EWeaponType::EWT_AssaultRifle:
+		return 50; // example amount for Assault Rifle
+	case EWeaponType::EWT_Shotgun:
+		return 8;  // example amount for Shotgun
+	default:
+		return 0;
+	}
+}

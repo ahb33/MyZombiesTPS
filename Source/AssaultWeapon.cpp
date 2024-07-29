@@ -11,64 +11,66 @@ void AAssaultWeapon::Fire(const FVector& HitTarget)
 {
     Super::Fire(HitTarget); // Call the base class version of Fire
 
-    // Cast the owner to a pawn - the character firing the weapon is the owner of the projectile
-    APawn* InstigatorPawn = Cast<APawn>(GetOwner());
+    APawn* InstigatorPawn = Cast<APawn>(GetOwner()); // Cast the owner to a pawn
 
-    // Spawn the projectile at the "MuzzleFlash" socket on the weapon
     const USkeletalMeshSocket* MuzzleFlashSocket = GetWeaponMesh()->GetSocketByName(FName("MuzzleFlash")); 
 
     UE_LOG(LogTemp, Warning, TEXT("HitTarget: %s"), *HitTarget.ToString());
 
-    // Check if the socket is valid and the weapon is not empty
-    if(MuzzleFlashSocket && !WeaponIsEmpty())
+   
+    if (MuzzleFlashSocket && !WeaponIsEmpty())
     {
         SocketTransform = MuzzleFlashSocket->GetSocketTransform(GetWeaponMesh());
-        FVector Start = SocketTransform.GetLocation();
-        FVector End = Start + (HitTarget - Start) * 1.25;
+        FVector MuzzleLocation = SocketTransform.GetLocation();
 
+        FVector CameraLocation;
+        FRotator CameraRotation;
+        InstigatorPawn->GetActorEyesViewPoint(CameraLocation, CameraRotation);
+
+        FVector CameraDirection = CameraRotation.Vector();
+        FVector CameraEnd = CameraLocation + CameraDirection * Trace_Length;
+
+        FHitResult CameraHit;
+        GetWorld()->LineTraceSingleByChannel(CameraHit, CameraLocation, CameraEnd, ECollisionChannel::ECC_Visibility);
+
+        FVector AdjustedHitTarget = CameraHit.bBlockingHit ? CameraHit.ImpactPoint : CameraEnd;
         
-		FHitResult FireHit;
-		WeaponTraceHit(Start, HitTarget, FireHit);
+        FVector MuzzleToAdjustedTarget = (AdjustedHitTarget - MuzzleLocation).GetSafeNormal();
+        FVector End = MuzzleLocation + MuzzleToAdjustedTarget * Trace_Length;
 
-        if(ImpactParticles)
+        FHitResult FireHit;
+        WeaponTraceHit(MuzzleLocation, End, FireHit);
+
+        DrawDebugLine(GetWorld(), MuzzleLocation, End, FColor::Red, false, 1.0f, 0, 1.0f);
+        DrawDebugPoint(GetWorld(), FireHit.ImpactPoint, 10, FColor::Green, false, 1.0f);
+
+        if (ImpactParticles)
         {
-            UGameplayStatics::SpawnEmitterAtLocation(GetWorld(),
-            ImpactParticles, FireHit.ImpactPoint, FireHit.ImpactNormal.Rotation());
+            UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactParticles, FireHit.ImpactPoint, FireHit.ImpactNormal.Rotation());
         }
-	}   
+    }
 }
 
-void AAssaultWeapon::WeaponTraceHit(const FVector& TraceStart, const FVector& HitTarget, FHitResult& FireHit)
+void AAssaultWeapon::WeaponTraceHit(const FVector& TraceStart, const FVector& TraceEnd, FHitResult& FireHit)
 {
     UWorld* World = GetWorld();
-     if(World)
+    if (World)
+    {
+        World->LineTraceSingleByChannel(FireHit, TraceStart, TraceEnd, ECollisionChannel::ECC_Visibility);
+
+        if (FireHit.bBlockingHit)
         {
-            FVector End = TraceStart + (HitTarget - TraceStart) * 1.25f;
-
-            World->LineTraceSingleByChannel(FireHit, 
-            TraceStart, 
-            End, 
-            ECollisionChannel::ECC_Visibility);
-
-            FVector BeamEnd = End;
-
-            if(FireHit.bBlockingHit)
+            AEnemyCharacter* HitEnemy = Cast<AEnemyCharacter>(FireHit.GetActor());
+            if (HitEnemy)
             {
-                BeamEnd = FireHit.ImpactPoint;
-
-                // First, check if the hit actor is an enemy
-                AEnemyCharacter* HitEnemy = Cast<AEnemyCharacter>(FireHit.GetActor());
-                if (HitEnemy)
-                {
-                    HitEnemy->EnemyDamage(GetDamage());
-                }
-            }
-            else
-            {
-                FireHit.ImpactPoint = End;
+                HitEnemy->EnemyDamage(GetDamage());
             }
         }
+
+        DrawDebugPoint(GetWorld(), FireHit.ImpactPoint, 10, FColor::Green, false, 1.0f);
+    }
 }
+
 void AAssaultWeapon::SetAmmo(int32 NewAmmoOnHand, int32 NewAmmoInMag)
 {
     AssaultWeaponAmmoOnHand = NewAmmoOnHand;
@@ -110,6 +112,12 @@ void AAssaultWeapon::ReloadAmmo(int32 AmmoAmount)
     AssaultWeaponAmmoInMag = FMath::Max(AssaultWeaponAmmoInMag, 0);
 
 }
+
+void AAssaultWeapon::AddAmmoPickUp(int32 AmmoAdd)
+{
+
+}
+
 
 float AAssaultWeapon::GetDamage() const
 {
