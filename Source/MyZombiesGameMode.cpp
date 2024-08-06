@@ -8,6 +8,8 @@
 #include "EnemyCharacter.h"
 #include "UObject/ConstructorHelpers.h"
 
+
+// MODIFY GAMEMODE CLASSES TO HANDLE PVP & PVE
 AMyZombiesGameMode::AMyZombiesGameMode()
 {
 	// set default pawn class to our Blueprinted character

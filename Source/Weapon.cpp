@@ -64,6 +64,14 @@ void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 
 	DOREPLIFETIME(AWeapon, EquippedWeapon);
 	DOREPLIFETIME(AWeapon, SecondaryWeapon);
+	DOREPLIFETIME(AWeapon, PlayerCharacter);
+    DOREPLIFETIME(AWeapon, PrimaryWeapon);
+    DOREPLIFETIME(AWeapon, MaxAmmoOnHand);
+    DOREPLIFETIME(AWeapon, ReloadAmount);
+    DOREPLIFETIME(AWeapon, WeaponState);
+	DOREPLIFETIME(AWeapon, CombatState);
+	
+
 
 
 
@@ -547,23 +555,24 @@ void AWeapon::PickUpAmmo(EWeaponType PickupType, int32 AmmoPickupAmount)
 
 void AWeapon::RefreshHUD()
 {
-	PlayerController = Cast<AMyPlayerController>(MainCharacter->GetController());
-
-    if (PlayerController)
+    if (MainCharacter)
     {
-        PlayerController->SetHUDAmmo(GetCurrentAmmoOnHand());
-        PlayerController->SetHUDMagAmmo(GetCurrentAmmoInMag());
+        AMyPlayerController* PlayerController = Cast<AMyPlayerController>(MainCharacter->GetController());
+        if (PlayerController)
+        {
+            PlayerController->SetHUDAmmo(GetCurrentAmmoOnHand());
+            PlayerController->SetHUDMagAmmo(GetCurrentAmmoInMag());
+        }
     }
 }
 void AWeapon::SetHUDAmmo(int32 Ammo)
 {
     if (MainCharacter)
     {
-        PlayerController = Cast<AMyPlayerController>(MainCharacter->GetController());
+        AMyPlayerController* PlayerController = Cast<AMyPlayerController>(MainCharacter->GetController());
         if (PlayerController)
         {
-            PlayerController->SetHUDAmmo(GetCurrentAmmoOnHand());
-			// UE_LOG(LogTemp, Warning, TEXT("SetHUDAmmo called. AmmoOnHand: %d"), Ammo);
+            PlayerController->SetHUDAmmo(Ammo);
         }
     }
 }
@@ -572,13 +581,12 @@ void AWeapon::SetHUDMagAmmo(int32 MagAmmo)
 {
     if (MainCharacter)
     {
-        PlayerController = Cast<AMyPlayerController>(MainCharacter->GetController());
+        AMyPlayerController* PlayerController = Cast<AMyPlayerController>(MainCharacter->GetController());
         if (PlayerController)
         {
-            PlayerController->SetHUDMagAmmo(GetCurrentAmmoInMag());
-			// UE_LOG(LogTemp, Warning, TEXT("SetHUDAmmo called. Ammo in Mag is: %d"), MagAmmo);
+            PlayerController->SetHUDMagAmmo(MagAmmo);
         }
-    }	
+    }
 }
 
 // replicating ammo on client
@@ -619,7 +627,6 @@ void AWeapon::OnRep_Owner()
 	if(Owner == nullptr)
 	{
 		MainCharacter = nullptr;
-		PlayerController = nullptr;
 	}
 	else
 	{
@@ -712,104 +719,85 @@ FVector AWeapon::CrossHairTrace(FHitResult& TraceHitResult)
 {
 	FVector2D ViewportSize;
 
-	if (GEngine && GEngine->GameViewport)
-	{
-		GEngine->GameViewport->GetViewportSize(ViewportSize);
-	}
-		
-	FVector2D CrosshairLocation(ViewportSize.X / 2.f, ViewportSize.Y / 2.f);
-	FVector CrosshairWorldPosition;
-	FVector CrosshairWorldDirection;
+    if (GEngine && GEngine->GameViewport)
+    {
+        GEngine->GameViewport->GetViewportSize(ViewportSize);
+        UE_LOG(LogTemp, Warning, TEXT("Viewport Size: %s"), *ViewportSize.ToString());
+    }
 
-	bool bScreenToWorld = UGameplayStatics::DeprojectScreenToWorld(
-		UGameplayStatics::GetPlayerController(this, 0), CrosshairLocation, CrosshairWorldPosition,
-		CrosshairWorldDirection
-	);
+    FVector2D CrosshairLocation(ViewportSize.X / 2.f, ViewportSize.Y / 2.f);
+    FVector CrosshairWorldPosition;
+    FVector CrosshairWorldDirection;
 
-	if (bScreenToWorld)
-	{	
-		FVector Start = CrosshairWorldPosition;
-		FVector End = Start + CrosshairWorldDirection * Trace_Length;
-		GetWorld()->LineTraceSingleByChannel(TraceHitResult, Start, End, ECollisionChannel::ECC_Visibility);
+    bool bScreenToWorld = UGameplayStatics::DeprojectScreenToWorld(
+        UGameplayStatics::GetPlayerController(this, 0), CrosshairLocation, CrosshairWorldPosition,
+        CrosshairWorldDirection
+    );
 
-		if(TraceHitResult.bBlockingHit)  // if you get a blocking hit set result to impact point of trace
-		{
-			LocalHitTarget = TraceHitResult.ImpactPoint;
-		}
+    UE_LOG(LogTemp, Warning, TEXT("Crosshair Location: %s"), *CrosshairLocation.ToString());
+    UE_LOG(LogTemp, Warning, TEXT("Crosshair World Position: %s"), *CrosshairWorldPosition.ToString());
+    UE_LOG(LogTemp, Warning, TEXT("Crosshair World Direction: %s"), *CrosshairWorldDirection.ToString());
 
-		else
-		{
-			LocalHitTarget = End;
-		}
-	}
+    if (bScreenToWorld)
+    {
+        FVector Start = CrosshairWorldPosition;
+        FVector End = Start + CrosshairWorldDirection * Trace_Length;
+        bool bHit = GetWorld()->LineTraceSingleByChannel(TraceHitResult, Start, End, ECollisionChannel::ECC_Visibility);
 
-	return TraceHitResult.ImpactPoint;
+        if (bHit && TraceHitResult.bBlockingHit)
+        {
+            LocalHitTarget = TraceHitResult.ImpactPoint;
+            UE_LOG(LogTemp, Warning, TEXT("Line Trace Hit at: %s"), *TraceHitResult.ImpactPoint.ToString());
+            return TraceHitResult.ImpactPoint;
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Line Trace did not hit"));
+            return End;
+        }
+    }
+
+    UE_LOG(LogTemp, Warning, TEXT("Screen to World conversion failed"));
+    return FVector::ZeroVector;
 }
 
 void AWeapon::SetHUDCrosshairs(float Deltatime)
 {
-	// PlayerController = PlayerController == nullptr ? Cast<AMyPlayerController>(MainCharacter->Controller) : PlayerController;
-	PlayerController = PlayerController == nullptr ? Cast<AMyPlayerController>(MainCharacter->GetController()) : PlayerController;	
+    if (MainCharacter == nullptr) return;
 
-	const FString ControllerClassName = MainCharacter->Controller->GetClass()->GetName();
-	// UE_LOG(LogTemp, Warning, TEXT("MainCharacter's controller class name: %s"), *ControllerClassName);
-	if (PlayerController == nullptr)
-	{
-    	// UE_LOG(LogTemp, Warning, TEXT("Failed to cast MainCharacter's controller to AMyPlayerController"));
-    	return;
-	}	
-		if (PlayerController)
-		{
-			// UE_LOG(LogTemp, Warning, TEXT("Player Controller valid"));
+    AMyPlayerController* PlayerController = Cast<AMyPlayerController>(MainCharacter->GetController());
+    if (PlayerController == nullptr)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Failed to cast MainCharacter's controller to AMyPlayerController"));
+        return;
+    }
 
-				
-			HUD = HUD == nullptr ? Cast<AMyHUD>(PlayerController->GetHUD()) : HUD;
-			if (HUD)
-			{
-				// UE_LOG(LogTemp, Warning, TEXT("Weapon HUD valid"));
+    HUD = HUD == nullptr ? Cast<AMyHUD>(PlayerController->GetHUD()) : HUD;
+    if (HUD)
+    {
+        if (EquippedWeapon == nullptr)
+        {
+            // UE_LOG(LogTemp, Warning, TEXT("Equipped Weapon not valid in set HUD"));
+            return;
+        }
 
-				if (EquippedWeapon == nullptr)
-				{
-					// UE_LOG(LogTemp, Warning, TEXT("Equipped Weapon not valid in set HUD"));
-					return;
-				}
+        HUDPackage.CrosshairsCenter = EquippedWeapon->CrosshairsCenter;
+        HUDPackage.CrosshairsLeft = EquippedWeapon->CrosshairsLeft;
+        HUDPackage.CrosshairsRight = EquippedWeapon->CrosshairsRight;
+        HUDPackage.CrosshairsBottom = EquippedWeapon->CrosshairsBottom;
+        HUDPackage.CrosshairsTop = EquippedWeapon->CrosshairsTop;
 
-				// UE_LOG(LogTemp, Warning, TEXT("Equipped Weapon valid"));
+        FVector2D SpeedRange(0.f, MainCharacter->GetCharacterMovement()->MaxWalkSpeed);
+        FVector2D VelocityRange(0.f , 1.f);
+        FVector Velocity = MainCharacter->GetVelocity();
+        Velocity.Z = 0.f;
 
-				HUDPackage.CrosshairsCenter = EquippedWeapon->CrosshairsCenter;
-				HUDPackage.CrosshairsLeft = EquippedWeapon->CrosshairsLeft;
-				HUDPackage.CrosshairsRight = EquippedWeapon->CrosshairsRight;
-				HUDPackage.CrosshairsBottom = EquippedWeapon->CrosshairsBottom;
-				HUDPackage.CrosshairsTop = EquippedWeapon->CrosshairsTop;
+        CrosshairVelocityFactor = FMath::GetMappedRangeValueClamped(SpeedRange, VelocityRange, Velocity.Size());
 
-				// Calculate crosshair spread
-				/*
-				[0,600] -> [0,1]
-				Create FVector2D representing range of motion from 0-> max walk speed
-				Create FVector2D representing the velocity range from 0-> 1
-				Map velocity to the FVector2D representing velocity range
-				Set velocity in Z to 0.f
-				FMath::GetMappedRangeValueClamped()
-				set HUDs crosshair spread based on velocity factor value declared
-				*/
-				
-				FVector2D SpeedRange(0.f, MainCharacter->GetCharacterMovement()->MaxWalkSpeed);
-				FVector2D VelocityRange(0.f , 1.f);
-				FVector Velocity = MainCharacter->GetVelocity();
-				Velocity.Z = 0.f;
+        HUDPackage.CrosshairSpread = 0.5f + CrosshairVelocityFactor;
 
-				CrosshairVelocityFactor = FMath::GetMappedRangeValueClamped(SpeedRange, VelocityRange, Velocity.Size());
-
-				HUDPackage.CrosshairSpread = 0.5f + CrosshairVelocityFactor;
-
-				HUD->SetHUDPackage(HUDPackage);
-			}
-		}
-
-	else
-	{
-		// UE_LOG(LogTemp, Warning, TEXT("Player Controller is null"));
-	}
+        HUD->SetHUDPackage(HUDPackage);
+    }
 }
 
 

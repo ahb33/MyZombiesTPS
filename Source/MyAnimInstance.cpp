@@ -63,7 +63,6 @@ void UMyAnimInstance::UpdateCharacterProperties(float DeltaTime)
     EquippedWeapon = MainCharacter->GetEquippedWeapon();
     bIsCrouched = MainCharacter->bIsCrouched;
     bAiming = MainCharacter->IsAiming();
-    bIsPlayerReloading = MainCharacter->IsReloading();
     TurningInPlace = MainCharacter->GetTurningInPlace();
 
     FRotator AimRotation = MainCharacter->GetBaseAimRotation();

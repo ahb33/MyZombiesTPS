@@ -174,6 +174,7 @@ public:
 	UFUNCTION()
 	void OnRep_WeaponState();
 
+	
 	void SetWeaponState(EWeaponState WeaponState); // Create function to SetWeaponState
 
 
@@ -210,10 +211,6 @@ private:
 
 	UPROPERTY(Replicated)
 	AMainCharacter* PlayerCharacter;
-
-	UPROPERTY()
-	class AMyPlayerController* PlayerController;
-
 
 	UPROPERTY(ReplicatedUsing = OnRep_EquippedWeapon)
 	class AWeapon* EquippedWeapon; // variable that will store currently equipped weapon 

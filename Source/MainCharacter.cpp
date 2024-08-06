@@ -56,28 +56,45 @@ void AMainCharacter::BeginPlay()
 	UE_LOG(LogTemp, Warning, TEXT("MainCharacter BeginPlay() called"));
 	
 
-	MyPlayerController = Cast<AMyPlayerController>(Controller);
-	// Log a message to confirm that the player controller is valid
-    if (Controller != nullptr)
+    // Validate and cast the player controller
+    MyPlayerController = Cast<AMyPlayerController>(Controller);
+    if (MyPlayerController)
     {
         UE_LOG(LogTemp, Warning, TEXT("Main character's player controller is valid"));
+        MyPlayerController->SetHUDHealth(PlayerHealth, MAXHealth);
     }
     else
     {
-        UE_LOG(LogTemp, Warning, TEXT("Main character's player controller is null"));
+        UE_LOG(LogTemp, Error, TEXT("Main character's player controller is null"));
     }
 
-	MyGameHUD = Cast<AMyHUD>(GetWorld()->GetFirstPlayerController()->GetHUD());
-	if(MyGameHUD)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("MyGameHUD in MainCharacter is valid"));
-		MyGameHUD->AddCharacterStats();
-	}
+	
+    // Validate and cast the HUD
+    if (APlayerController* PlayerController = GetWorld()->GetFirstPlayerController())
+    {
+        if (AHUD* HUD = PlayerController->GetHUD())
+        {
+            MyGameHUD = Cast<AMyHUD>(HUD);
+            if (MyGameHUD)
+            {
+                UE_LOG(LogTemp, Warning, TEXT("MyGameHUD in MainCharacter is valid"));
+                MyGameHUD->AddCharacterStats();
+            }
+            else
+            {
+                UE_LOG(LogTemp, Error, TEXT("MyGameHUD is null"));
+            }
+        }
+        else
+        {
+            UE_LOG(LogTemp, Error, TEXT("HUD is null"));
+        }
+    }
+    else
+    {
+        UE_LOG(LogTemp, Error, TEXT("PlayerController is null"));
+    }
 
-	if(MyPlayerController)
-	{
-		MyPlayerController->SetHUDHealth(PlayerHealth, MAXHealth);
-	}
 
 	// pickUpHealth = Cast<AHealthPickUp>(UGameplayStatics::GetActorOfClass(this, AHealthPickUp::StaticClass()));
 
@@ -120,6 +137,9 @@ void AMainCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 
 	DOREPLIFETIME_CONDITION(AMainCharacter, OverlappingWeapon, COND_OwnerOnly);
 	DOREPLIFETIME(AMainCharacter, PlayerHealth);
+	DOREPLIFETIME(AMainCharacter, MAXHealth);
+
+
 
 
 }

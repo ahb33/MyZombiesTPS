@@ -2,6 +2,7 @@
 
 
 #include "EnemyCharacter.h"
+#include "Net/UnrealNetwork.h"
 #include "MyZombiesGameMode.h"
 
 
@@ -26,6 +27,13 @@ void AEnemyCharacter::BeginPlay()
 	
 }
 
+void AEnemyCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+    DOREPLIFETIME(AEnemyCharacter, Health);
+}
+
 // Called every frame
 void AEnemyCharacter::Tick(float DeltaTime)
 {
@@ -43,29 +51,37 @@ void AEnemyCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 // Called to bind functionality to input
 void AEnemyCharacter::EnemyDamage(float Damage)
 {
-	Health -= Damage;
-	UE_LOG(LogTemp, Warning, TEXT("Enemy health is now: %f"), Health);
-	if(Health <= 0.0f)
-	{
+    if (HasAuthority()) // Ensure damage is processed only on the server
+    {
+        Health -= Damage;
         UE_LOG(LogTemp, Warning, TEXT("Enemy health is now: %f"), Health);
-		// Check if the AnimInstanceRef is valid before calling SetIsDead
-        if (AnimInstanceRef)
+        if (Health <= 0.0f)
         {
-            AnimInstanceRef->SetIsDead(true);
+            if (AnimInstanceRef)
+            {
+                AnimInstanceRef->SetIsDead(true);
+            }
+            GetWorld()->GetTimerManager().SetTimer(DestructionTimer, this, &AEnemyCharacter::Die, 1.0f, false);
         }
-        // Set a timer to destroy the zombie after a delay
-        GetWorld()->GetTimerManager().SetTimer(DestructionTimer, this, &AEnemyCharacter::Die, 1.0f, false);
     }
 }
 
 
 void AEnemyCharacter::Die()
 {
-    Destroy();
-	myGameMode = GetWorld()->GetAuthGameMode<AMyZombiesGameMode>();
-    if (myGameMode)
+    if (HasAuthority()) // Ensure destruction is processed only on the server
     {
-        myGameMode->CheckEnemiesAlive();
+        Destroy();
+        myGameMode = GetWorld()->GetAuthGameMode<AMyZombiesGameMode>();
+        if (myGameMode)
+        {
+            myGameMode->CheckEnemiesAlive();
+        }
     }
+}
+
+void AEnemyCharacter::OnRep_Health()
+{
+
 }
 

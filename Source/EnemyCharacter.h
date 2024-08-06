@@ -33,14 +33,19 @@ public:
 
 	void Die();
 
+	UFUNCTION()
+	void OnRep_Health();
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 private:	
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Health, meta = (AllowPrivateAccess = "true"))
-	float Health;
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Health, meta = (AllowPrivateAccess = "true"), ReplicatedUsing = OnRep_Health)
+    float Health;
 
 	UAI_AnimInstance* AnimInstanceRef;
 

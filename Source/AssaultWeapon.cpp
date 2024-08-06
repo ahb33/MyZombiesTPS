@@ -13,41 +13,36 @@ void AAssaultWeapon::Fire(const FVector& HitTarget)
 
     APawn* InstigatorPawn = Cast<APawn>(GetOwner()); // Cast the owner to a pawn
 
-    const USkeletalMeshSocket* MuzzleFlashSocket = GetWeaponMesh()->GetSocketByName(FName("MuzzleFlash")); 
+    const USkeletalMeshSocket* MuzzleFlashSocket = GetWeaponMesh()->GetSocketByName(FName("MuzzleFlash"));
 
-    UE_LOG(LogTemp, Warning, TEXT("HitTarget: %s"), *HitTarget.ToString());
-
-   
     if (MuzzleFlashSocket && !WeaponIsEmpty())
     {
+        UE_LOG(LogTemp, Warning, TEXT("MuzzleFlashSocket is valid and weapon is not empty"));
         SocketTransform = MuzzleFlashSocket->GetSocketTransform(GetWeaponMesh());
         FVector MuzzleLocation = SocketTransform.GetLocation();
 
-        FVector CameraLocation;
-        FRotator CameraRotation;
-        InstigatorPawn->GetActorEyesViewPoint(CameraLocation, CameraRotation);
-
-        FVector CameraDirection = CameraRotation.Vector();
-        FVector CameraEnd = CameraLocation + CameraDirection * Trace_Length;
-
         FHitResult CameraHit;
-        GetWorld()->LineTraceSingleByChannel(CameraHit, CameraLocation, CameraEnd, ECollisionChannel::ECC_Visibility);
+        FVector AdjustedHitTarget = CrossHairTrace(CameraHit);
 
-        FVector AdjustedHitTarget = CameraHit.bBlockingHit ? CameraHit.ImpactPoint : CameraEnd;
-        
-        FVector MuzzleToAdjustedTarget = (AdjustedHitTarget - MuzzleLocation).GetSafeNormal();
-        FVector End = MuzzleLocation + MuzzleToAdjustedTarget * Trace_Length;
+        FVector Direction = (AdjustedHitTarget - MuzzleLocation).GetSafeNormal();
+        FVector End = MuzzleLocation + Direction * Trace_Length;
 
         FHitResult FireHit;
         WeaponTraceHit(MuzzleLocation, End, FireHit);
-
-        DrawDebugLine(GetWorld(), MuzzleLocation, End, FColor::Red, false, 1.0f, 0, 1.0f);
-        DrawDebugPoint(GetWorld(), FireHit.ImpactPoint, 10, FColor::Green, false, 1.0f);
 
         if (ImpactParticles)
         {
             UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactParticles, FireHit.ImpactPoint, FireHit.ImpactNormal.Rotation());
         }
+
+        DrawDebugLine(GetWorld(), MuzzleLocation, End, FColor::Red, false, 1.0f, 0, 1.0f);
+        DrawDebugPoint(GetWorld(), FireHit.ImpactPoint, 10, FColor::Green, false, 1.0f);
+
+        UE_LOG(LogTemp, Warning, TEXT("Firing weapon at %s"), *AdjustedHitTarget.ToString());
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Failed to fire weapon: MuzzleFlashSocket invalid or weapon is empty"));
     }
 }
 
