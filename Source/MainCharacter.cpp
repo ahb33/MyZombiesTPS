@@ -8,6 +8,7 @@
 #include "Components/WidgetComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "EngineUtils.h"
+#include "Weapon.h"
 #include "MyHUD.h"
 #include "Animation/AnimInstance.h" 
 #include "WeaponTypes.h"
@@ -44,8 +45,6 @@ AMainCharacter::AMainCharacter()
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
 	TurningInPlace = ETurningInPlace::ETIP_NotTurning;
 
-
-
 } 
 
 
@@ -53,8 +52,6 @@ AMainCharacter::AMainCharacter()
 void AMainCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-	UE_LOG(LogTemp, Warning, TEXT("MainCharacter BeginPlay() called"));
-	
 
     // Validate and cast the player controller
     MyPlayerController = Cast<AMyPlayerController>(Controller);
@@ -77,7 +74,6 @@ void AMainCharacter::BeginPlay()
             MyGameHUD = Cast<AMyHUD>(HUD);
             if (MyGameHUD)
             {
-                UE_LOG(LogTemp, Warning, TEXT("MyGameHUD in MainCharacter is valid"));
                 MyGameHUD->AddCharacterStats();
             }
             else
@@ -160,6 +156,7 @@ void AMainCharacter::PostInitializeComponents()
 		myWeapon->MainCharacter = this;
 	}
 }
+
 void AMainCharacter::MoveForward(float value)
 {
 	if(Controller != nullptr && value != 0.f)
@@ -248,14 +245,16 @@ void AMainCharacter::SetOverlappingItem(APickUp* PickUp)
 
 }
 
-
-
-
 bool AMainCharacter::IsWeaponEquipped()
 {
 	return (myWeapon && myWeapon->EquippedWeapon);
 }
 
+
+void AMainCharacter::ServerEquipButtonPressed_Implementation()
+{
+    
+}
 void AMainCharacter::EquipButtonPressed()
 {
 	
@@ -297,7 +296,6 @@ void AMainCharacter::FireButtonPressed()
 {
 	if(myWeapon)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Fire Button Pressed"));
 		myWeapon->FireButtonPressed(true);
 	}
 
@@ -372,13 +370,11 @@ void AMainCharacter::PlayFireMontage(bool bAiming)
 		if(bAiming)
 		{
 			SectionName = FName("FireIronSight");
-			UE_LOG(LogTemp, Warning, TEXT("Rifle IronSight Aiming Montage"));
 
 		}
 		else
 		{
-			SectionName = FName("RifleHip");
-			UE_LOG(LogTemp, Warning, TEXT("Rifle Hip Montage"));
+			SectionName = FName("RifleHip");			
 		}
 
 		AnimInstance->Montage_JumpToSection(SectionName);
@@ -431,8 +427,8 @@ float AMainCharacter::GetReloadDuration()
 
 AWeapon *AMainCharacter::GetEquippedWeapon()
 {
-    if(myWeapon == nullptr) return nullptr; // we wont get a crash when trying to access a nullptr
-	return myWeapon->EquippedWeapon;
+    if(myWeapon == nullptr) return nullptr; 
+	return myWeapon->GetWeapon();
 
 }
 

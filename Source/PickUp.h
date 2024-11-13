@@ -36,8 +36,6 @@ protected:
 	// you only want overlap events to happen on the server
 
 
-
-
 private:
 
 	UPROPERTY(VisibleAnywhere, Category = Item)

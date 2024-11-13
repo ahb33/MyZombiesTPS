@@ -7,6 +7,8 @@
 #include "Components/WidgetComponent.h"
 #include "Components/SphereComponent.h"
 
+
+// fix redundancies code
 // Sets default values
 APickUp::APickUp()
 {

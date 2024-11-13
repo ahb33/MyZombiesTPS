@@ -19,7 +19,6 @@ class MYZOMBIES_API UCharacterStats : public UUserWidget
 
 public: 
 
-
 	void SetHealthBar(UProgressBar* NewHealthBar); // this function will be used to initialize HealthBar
 
 	//This will allow you to select the class you need in the HUD when you create the widget

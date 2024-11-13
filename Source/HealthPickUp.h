@@ -35,17 +35,14 @@ public:
 	
 	void AddHealth(float PlayerHealth, float MaxHealth);
 
-
 	void ShowPickUpWidget(bool bShowWidget);
 	
-
 
 private:
 
 	class AMainCharacter* MainCharacter;
 
     UWidgetComponent* HealthPickUpWidget;
-
 	
 	UPROPERTY(VisibleAnywhere)
 	class UNiagaraComponent* NiagaraHealthComponent;

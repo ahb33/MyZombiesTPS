@@ -30,8 +30,6 @@ public:
 
 	virtual void ReloadAmmo(int32 Ammo) override;
 
-	virtual void AddAmmoPickUp(int32 AmmoAdd) override;
-
 	virtual float GetDamage() const override; 
 
 	void WeaponTraceHit(const FVector& TraceStart, const FVector& HitTarget, FHitResult& OutHit);
@@ -63,10 +61,7 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	float Damage;
-
-
-
-
-
 	
+	
+
 };

@@ -12,9 +12,6 @@ void AMyHUD::BeginPlay()
 {
 	Super::BeginPlay();
 
-
-	UE_LOG(LogTemp, Warning, TEXT("MyHUD begin play called"));
-
 }
 
 void AMyHUD::AddCharacterStats()
@@ -46,7 +43,8 @@ void AMyHUD::DrawHUD()
 {
 	Super::DrawHUD();
 
-	/*Check if GEngine is valid and if GEngine->GameViewport is valid
+	/*
+	Check if GEngine is valid and if GEngine->GameViewport is valid
 	FVector2D ViewportSize - 
 	Get Viewport size (ViewportSize) - GEngine->GameViewport has function to get the ViewportSize and it takes a 2D FVector
 	Set CrosshairLocation to be x,y coordinates of ViewportSize

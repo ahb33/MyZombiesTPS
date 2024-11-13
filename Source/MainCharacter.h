@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
-#include "Weapon.h"
+
 #include "TurnInPlace.h"
 #include "CombatState.h"
 #include "HealthPickUp.h"
@@ -33,7 +33,7 @@ public:
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
-	void SetOverlappingWeapon(AWeapon* Weapon);
+	void SetOverlappingWeapon(class AWeapon* Weapon);
 	void SetOverlappingItem(APickUp* PickUp);	
 	bool IsWeaponEquipped();
 	bool IsAiming();
@@ -46,10 +46,10 @@ public:
 
 	void PlayReloadMontage();
 	
-	AWeapon* GetEquippedWeapon();
+	class AWeapon* GetEquippedWeapon();
 
 	UFUNCTION()
-	void OnRep_OverlappingWeapon(AWeapon* LastWeapon); // this function will be called whenever the variable's value is replicated
+	void OnRep_OverlappingWeapon(class AWeapon* LastWeapon); // this function will be called whenever the variable's value is replicated
 
 	FORCEINLINE float GetCharacterYaw() const { return AO_Yaw; }
 	FORCEINLINE float GetCharacterPitch() const { return AO_Pitch; }
@@ -65,8 +65,10 @@ public:
 
 	FVector GetHitTarget() const;
 
-	void PickUpButtonPressed();
-
+    // call on client and execute on server
+    UFUNCTION(Server, Reliable)
+    void ServerEquipButtonPressed();
+	
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -83,6 +85,7 @@ protected:
 	void FireButtonPressed();
 	void FireButtonReleased();
 	void ReloadButtonPressed();
+	void PickUpButtonPressed();
 	void AimOffset(float DeltaTime);
 
 	
@@ -95,7 +98,7 @@ private:
 	class UCameraComponent* FollowCamera;
 
 	UPROPERTY(VisibleAnywhere)
-	AWeapon* myWeapon; // this pointer variable will have access to the Weapon class
+	class AWeapon* myWeapon; // this pointer variable will have access to the Weapon class
 
 	class AMyPlayerController* MyPlayerController;
 

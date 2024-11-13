@@ -6,7 +6,6 @@
 #include "GameFramework/Actor.h"
 #include "Animation/AnimationAsset.h" 
 #include "Components/SkeletalMeshComponent.h"
-#include "GameFramework/Actor.h" 
 #include "Kismet/GameplayStatics.h"
 #include "MyHUD.h"
 #include "MyPlayerController.h"
@@ -55,6 +54,8 @@ public:
 	void EquipSecondaryWeapon(class AWeapon* SecondWeapon); /* this function take a pointer reference to the
 	Weapon class and will be responsible for equipping the secondary weapon */
 
+	class AWeapon* GetWeapon() const {return EquippedWeapon;}
+
 	void SwapWeapons();
 
 	void AttachActorToRightHand(AActor* ActorToAttach);
@@ -99,11 +100,9 @@ public:
 
 	bool ShouldSwapWeapons() const;
 
+	void FireButtonPressed(bool bFire); 
 
-	void FireButtonPressed(bool bFire); // declaring this function as virtual so that child classes can override it
-
-	virtual void Fire(const FVector& Hit); 
-
+	virtual void Fire(const FVector& Hit); // declaring this function as virtual so that child classes can override it
 
 	// function will subtract one and check if weapon has valid owner so it can update HUD for owner
 	void RoundFired(); 
@@ -138,7 +137,6 @@ public:
 
 	virtual void ReloadAmmo(int32 Ammo) {};
 
-	virtual void AddAmmoPickUp(int32 AmmoAdd) {};
 
 	virtual float GetDamage() const {return 20.f;}
 

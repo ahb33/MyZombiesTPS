@@ -8,6 +8,8 @@
 #include "AI_AnimInstance.h"
 #include "EnemyCharacter.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnZombieDeath);
+
 UCLASS(Abstract)
 class MYZOMBIES_API AEnemyCharacter : public ACharacter
 {
@@ -36,21 +38,38 @@ public:
 	UFUNCTION()
 	void OnRep_Health();
 
+    // Functions to set multipliers or adjust properties based on stats
+    void ApplyCharacterStats();
+
+	// Delegate that other classes can bind to
+    FOnZombieDeath OnZombieDeath;
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+	void OnBeginOverlap(AActor* OverlappedActor, AActor* OtherActor); // function will be used to attack maincharater when overlapping with it
+
 private:	
 
+	// overlap
+	class USphereComponent* CollisionSphere; 
+	
     UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Health, meta = (AllowPrivateAccess = "true"), ReplicatedUsing = OnRep_Health)
-    float Health;
-
+    float BaseHealth;
+	
+    UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = Health, meta = (AllowPrivateAccess = "true"), ReplicatedUsing = OnRep_Health)
+    float BaseDamage;
+	
 	UAI_AnimInstance* AnimInstanceRef;
 
 	FTimerHandle DestructionTimer; // Timer handle for delayed destruction
 
-	class AMyZombiesGameMode* myGameMode;
+	class ABaseGameMode* myGameMode;
+
+	// AI Character stats for configuring properties in the editor
+    FAICharacterStats CharacterStats;
 
 };

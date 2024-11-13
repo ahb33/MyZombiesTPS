@@ -12,11 +12,11 @@ void UMyAnimInstance::NativeInitializeAnimation()
 {
     Super::NativeInitializeAnimation();
 
-    if (!Pawn)
+    // Cache Pawn and MainCharacter safely
+    Pawn = TryGetPawnOwner();
+    if (Pawn)
     {
-        Pawn = TryGetPawnOwner();
         MainCharacter = Cast<AMainCharacter>(Pawn);
-
         if (MainCharacter)
         {
             EquippedWeapon = MainCharacter->GetEquippedWeapon();
@@ -28,23 +28,24 @@ void UMyAnimInstance::NativeUpdateAnimation(float DeltaTime)
 {
     Super::NativeUpdateAnimation(DeltaTime);
 
+    // Cache MainCharacter if it's not already cached
     if (!MainCharacter)
     {
-        MainCharacter = Cast<AMainCharacter>(TryGetPawnOwner());
+        Pawn = TryGetPawnOwner();
+        if (Pawn)
+        {
+            MainCharacter = Cast<AMainCharacter>(Pawn);
+        }
+
+        // If MainCharacter is still null after this point, exit early
         if (!MainCharacter) return;
     }
+    
+    // Continue updates if MainCharacter is valid
+    UpdateMovementProperties();
+    UpdateCharacterProperties(DeltaTime);
+    UpdateWeaponProperties();
 
-    if (!Pawn)
-    {
-        Pawn = TryGetPawnOwner();
-    }
-
-    if (Pawn)
-    {
-        UpdateMovementProperties();
-        UpdateCharacterProperties(DeltaTime);
-        UpdateWeaponProperties();
-    }
 }
 
 void UMyAnimInstance::UpdateMovementProperties()

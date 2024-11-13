@@ -91,7 +91,6 @@ void AShotgun::SetAmmo(int32 NewAmmoOnHand, int32 NewAmmoInMag)
 
 int32 AShotgun::GetCurrentAmmoOnHand() const
 {
-    UE_LOG(LogTemp, Warning, TEXT("GetCurrentAmmoOnHand() called for shotgun"));
     return ShotgunAmmoOnHand;
 }
 
@@ -123,10 +122,6 @@ void AShotgun::ReloadAmmo(int32 AmmoAmount)
 
 }
 
-void AShotgun::AddAmmoPickUp(int32 AmmoAdd)
-{
-
-}
 
 float AShotgun::GetDamage() const
 {

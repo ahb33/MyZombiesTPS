@@ -12,8 +12,10 @@
 #include "BehaviorTree/BehaviorTree.h"
 #include "MyAIController.generated.h"
 
-/**
- * 
+/*
+
+	This class will be used to control AI controller
+ 
  */
 UCLASS()
 class MYZOMBIES_API AMyAIController : public AAIController
@@ -36,8 +38,6 @@ public:
 
 	FVector LastKnownPlayerPosition;
 	
-	bool bCanSeePlayer;
-
 
 private: 
 
@@ -54,10 +54,16 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AI", meta=(AllowPrivateAccess = "true"))
 	UAISenseConfig_Hearing* HearingConfig;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "AI", meta=(AllowPrivateAccess = "true"))
+	TObjectPtr<class USphereComponent> Collision; // this will be used as a trigger for AI to grab the character
 
 	class AMainCharacter* MainCharacter;
-
-
 	// add AI Damage sense config
+
+	// Array to store the locations of other agents for simple avoidance
+    TArray<FVector> NearbyAgentLocations;
+    
+    // Function to update the nearby agent locations
+    void UpdateNearbyAgents();
 
 };

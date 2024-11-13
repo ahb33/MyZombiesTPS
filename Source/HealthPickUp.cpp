@@ -15,16 +15,13 @@ AHealthPickUp::AHealthPickUp()
 	bReplicates = true;
 	SetReplicateMovement(true); 
 
-    // Construct Pick up Widget and Niagara Health Component and attach to root
-    HealthPickUpWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthPickupWidget"));
     NiagaraHealthComponent = CreateDefaultSubobject<UNiagaraComponent>(TEXT("NiagaraHealthComponent"));
     NiagaraHealthComponent->SetupAttachment(RootComponent);
 
-    if(HealthPickUpWidget)
-	{
-		HealthPickUpWidget->SetVisibility(false);
-	}
-
+    // Construct Pick up Widget and Niagara Health Component and attach to root
+    HealthPickUpWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthPickupWidget"));
+	HealthPickUpWidget->SetupAttachment(RootComponent);
+	HealthPickUpWidget->SetVisibility(false);
 }
 
 void AHealthPickUp::OnSphereBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,

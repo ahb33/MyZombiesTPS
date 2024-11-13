@@ -31,7 +31,6 @@ AWeapon::AWeapon()
 	if you want the pawn to run through the weapon without colliding with it */
 	WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-
 	AreaSphere = CreateDefaultSubobject<USphereComponent>(TEXT("AreaSphere"));
 	AreaSphere->SetupAttachment(RootComponent); // attaches Area sphere to Weapon Mesh
 	AreaSphere->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore); /*Disable collision
@@ -50,8 +49,6 @@ void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(AWeapon, bAiming);
-
-
 
 	/*We'd like ammo on hand and the ammo in the magazine to be replicated on all clients in case one player picked up a used weapon
 	  then you want the ammo count on that weapon to remain unchanged
@@ -88,40 +85,33 @@ void AWeapon::BeginPlay()
 		AreaSphere->OnComponentBeginOverlap.AddDynamic(this, &AWeapon::OnSphereOverlap);
 		AreaSphere->OnComponentEndOverlap.AddDynamic(this, &AWeapon::OnSphereEndOverlap);
 
-
-
 	}
 	if(PickupWidget)
 	{
 		PickupWidget->SetVisibility(false);
 	}
-
 	
-
 	// Find the player's character in the world by iterating over all instances of the AMainCharacter class,
 	// and store a pointer to the first one found in the MainCharacter variable.
 	// This is necessary because some of the subsequent code requires a reference to the player's character.
+	// delete this approach- not suitable for multiplayer
 	for (TActorIterator<AMainCharacter> ActorItr(GetWorld()); ActorItr; ++ActorItr)
 	{
 		MainCharacter = *ActorItr;
 		break;
 	}
-
 	// Get the controller of the MainCharacter
 	AController* Controller = MainCharacter->GetController();
 	// modify for multiplayer
 	AMyPlayerController* MyController = Cast<AMyPlayerController>(UGameplayStatics::GetPlayerController(this, 0));
 
-	if (MyController)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Successfully retrieved player controller"));
-	}
-	else
+	if(!MyController)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Failed to retrieve player controller"));
+		return;
 	}
 
-    if(MainCharacter->HasAuthority())
+    if(HasAuthority())
     {
         SetAmmoInMag();
         SetAmmoOnHand();
@@ -284,11 +274,10 @@ void AWeapon::AttachWeaponToWeaponSocket(AActor* WeaponToAttach)
 	// AttachActor 
 	if(MainCharacter == nullptr || MainCharacter->GetMesh() == nullptr || WeaponToAttach == nullptr) return;
 	const USkeletalMeshSocket* WeaponSocket  = MainCharacter->GetMesh()->GetSocketByName(FName("SecondaryWeaponSocket"));
-	if(WeaponSocket )
+	if(WeaponSocket)
 	{
 		WeaponSocket ->AttachActor(WeaponToAttach, MainCharacter->GetMesh());
 	}
-
 }
 
 
@@ -331,18 +320,14 @@ void AWeapon::FireButtonPressed(bool bFire)
 
 void AWeapon::Fire(const FVector& Hit)
 {	
-    UE_LOG(LogTemp, Warning, TEXT("Ammo Count: %d"), AmmoOnHand);
     if (!WeaponIsEmpty())
     {
         RoundFired();
         bCanFire = false;
-        UE_LOG(LogTemp, Warning, TEXT("Firing Weapon"));
-
 
 		// If Animation is valid and CombatState unoccupied then play animation and montage
         if (FireAnim)
         {
-			UE_LOG(LogTemp, Warning, TEXT("Fire Anim is valid"));
             WeaponMesh->PlayAnimation(FireAnim, false);
             MainCharacter->PlayFireMontage(bAiming);
         }
@@ -357,7 +342,6 @@ void AWeapon::Fire(const FVector& Hit)
                 if (World)
                 {
                     World->SpawnActor<ACasing>(Casing, CasingMeshTransform.GetLocation(), CasingMeshTransform.GetRotation().Rotator());
-                    UE_LOG(LogTemp, Warning, TEXT("Bullet Casing Spawned"));
                 }
             }
         }
@@ -394,7 +378,6 @@ void AWeapon::RoundFired()
 
         // Now, update the HUD with the new ammo count
         RefreshHUD();
-        UE_LOG(LogTemp, Warning, TEXT("RoundFired() ammo on hand = %d"), GetCurrentAmmoOnHand());
     } 
     else
     {
@@ -423,16 +406,14 @@ void AWeapon::ShowPickUpWidget(bool bShowWidget)
 
 void AWeapon::SetAiming(bool bIsAiming)
 {
-	if (HasAuthority())
-	{
-		// We are on the server, so just set the value
-		ServerSetAiming(bIsAiming);
-	}
-	else
-	{
-		// We are on the client, so request the server to set the value
-		ServerSetAiming(bIsAiming);
-	}
+    if (!HasAuthority())
+    {
+        // We are on the client, so request the server to set the value
+        ServerSetAiming(bIsAiming);
+    }
+
+    // The server will set the value here or in ServerSetAiming_Implementation
+    bAiming = bIsAiming;
 }
 
 
@@ -545,7 +526,7 @@ void AWeapon::PickUpAmmo(EWeaponType PickupType, int32 AmmoPickupAmount)
     // Calculate the new ammo amount on hand
     int32 NewAmmoOnHand = CurrentAmmoOnHand + AmmoPickupAmount;
 
-	AddAmmoPickUp(NewAmmoOnHand);
+
 
 	// after value are set refresh HUD- change return type of AddAmmoPickUp - set new variable to accept
 	// return and then refresh HUD values
@@ -715,6 +696,7 @@ void AWeapon::OnRep_WeaponState()
 	}
 }
 
+
 FVector AWeapon::CrossHairTrace(FHitResult& TraceHitResult)
 {
 	FVector2D ViewportSize;
@@ -722,7 +704,7 @@ FVector AWeapon::CrossHairTrace(FHitResult& TraceHitResult)
     if (GEngine && GEngine->GameViewport)
     {
         GEngine->GameViewport->GetViewportSize(ViewportSize);
-        UE_LOG(LogTemp, Warning, TEXT("Viewport Size: %s"), *ViewportSize.ToString());
+        // UE_LOG(LogTemp, Warning, TEXT("Viewport Size: %s"), *ViewportSize.ToString());
     }
 
     FVector2D CrosshairLocation(ViewportSize.X / 2.f, ViewportSize.Y / 2.f);
@@ -734,9 +716,9 @@ FVector AWeapon::CrossHairTrace(FHitResult& TraceHitResult)
         CrosshairWorldDirection
     );
 
-    UE_LOG(LogTemp, Warning, TEXT("Crosshair Location: %s"), *CrosshairLocation.ToString());
-    UE_LOG(LogTemp, Warning, TEXT("Crosshair World Position: %s"), *CrosshairWorldPosition.ToString());
-    UE_LOG(LogTemp, Warning, TEXT("Crosshair World Direction: %s"), *CrosshairWorldDirection.ToString());
+    // UE_LOG(LogTemp, Warning, TEXT("Crosshair Location: %s"), *CrosshairLocation.ToString());
+    // UE_LOG(LogTemp, Warning, TEXT("Crosshair World Position: %s"), *CrosshairWorldPosition.ToString());
+    // UE_LOG(LogTemp, Warning, TEXT("Crosshair World Direction: %s"), *CrosshairWorldDirection.ToString());
 
     if (bScreenToWorld)
     {
@@ -747,12 +729,12 @@ FVector AWeapon::CrossHairTrace(FHitResult& TraceHitResult)
         if (bHit && TraceHitResult.bBlockingHit)
         {
             LocalHitTarget = TraceHitResult.ImpactPoint;
-            UE_LOG(LogTemp, Warning, TEXT("Line Trace Hit at: %s"), *TraceHitResult.ImpactPoint.ToString());
+            // UE_LOG(LogTemp, Warning, TEXT("Line Trace Hit at: %s"), *TraceHitResult.ImpactPoint.ToString());
             return TraceHitResult.ImpactPoint;
         }
         else
         {
-            UE_LOG(LogTemp, Warning, TEXT("Line Trace did not hit"));
+            // UE_LOG(LogTemp, Warning, TEXT("Line Trace did not hit"));
             return End;
         }
     }

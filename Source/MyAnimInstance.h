@@ -28,9 +28,8 @@ public:
 	void UpdateMovementProperties();
 	void UpdateCharacterProperties(float);
 	void UpdateWeaponProperties();
-
-
-
+	
+	
 private: 
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Animation, meta = (AllowPrivateAccess = "true"))
@@ -49,7 +48,7 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Animation,meta = (AllowPrivateAccess = "true"))
 	bool bIsAccelerating; // this variable will check if the character is accelerating
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Animation,meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Animation, meta = (AllowPrivateAccess = "true"))
 	bool bWeaponEquipped;
 
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = Animation, meta = (AllowPrivateAccess = "true"))
@@ -57,7 +56,6 @@ private:
 
 	UPROPERTY(BlueprintReadOnly, Category = Animation, meta = (AllowPrivateAccess = "true"))
 	bool bIsPlayerReloading;
-
 
 	UPROPERTY(VisibleAnywhere,BlueprintReadOnly, Category = Animation, meta = (AllowPrivateAccess = "true"))
 	bool bFireWeapon;

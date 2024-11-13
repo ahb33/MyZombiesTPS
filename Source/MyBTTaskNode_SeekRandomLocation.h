@@ -19,7 +19,6 @@ public:
 	UPROPERTY(EditAnywhere, Category = Blackboard)
 	FBlackboardKeySelector DestinationVector; // this will hold reference to the newly calculated desintation; needs to be accessible within blackboard
 
-
 	UPROPERTY(EditAnywhere, Category = Blackboard)
 	float Radius = 300.f; // needs to be accessible within blackboard
 

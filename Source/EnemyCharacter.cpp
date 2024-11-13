@@ -3,7 +3,9 @@
 
 #include "EnemyCharacter.h"
 #include "Net/UnrealNetwork.h"
-#include "MyZombiesGameMode.h"
+#include "AI_EnemySpawner.h"
+#include "Components/SphereComponent.h"
+#include "BaseGameMode.h"
 
 
 // Sets default values
@@ -11,6 +13,11 @@ AEnemyCharacter::AEnemyCharacter()
 {
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
+
+    CollisionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("CollisionSphere"));
+    CollisionSphere->SetSphereRadius(50);
+    CollisionSphere->SetupAttachment(RootComponent);
+
 
 }
 
@@ -31,7 +38,13 @@ void AEnemyCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-    DOREPLIFETIME(AEnemyCharacter, Health);
+    DOREPLIFETIME(AEnemyCharacter, BaseHealth);
+}
+
+void AEnemyCharacter::OnBeginOverlap(AActor *OverlappedActor, AActor *OtherActor)
+{
+    // add code for when overlapping with character
+    // debug line when overlapping 
 }
 
 // Called every frame
@@ -53,9 +66,9 @@ void AEnemyCharacter::EnemyDamage(float Damage)
 {
     if (HasAuthority()) // Ensure damage is processed only on the server
     {
-        Health -= Damage;
-        UE_LOG(LogTemp, Warning, TEXT("Enemy health is now: %f"), Health);
-        if (Health <= 0.0f)
+        BaseHealth -= Damage;
+        UE_LOG(LogTemp, Warning, TEXT("Enemy BaseHealth is now: %f"), BaseHealth);
+        if (BaseHealth <= 0.0f)
         {
             if (AnimInstanceRef)
             {
@@ -72,16 +85,33 @@ void AEnemyCharacter::Die()
     if (HasAuthority()) // Ensure destruction is processed only on the server
     {
         Destroy();
-        myGameMode = GetWorld()->GetAuthGameMode<AMyZombiesGameMode>();
+        myGameMode = GetWorld()->GetAuthGameMode<ABaseGameMode>();
         if (myGameMode)
         {
             myGameMode->CheckEnemiesAlive();
         }
     }
+
+    // Trigger the event
+    OnZombieDeath.Broadcast();
 }
 
 void AEnemyCharacter::OnRep_Health()
 {
 
+}
+
+void AEnemyCharacter::ApplyCharacterStats()
+{
+    // Clean, consistent application of character stats
+    if (GetCharacterMovement())
+    {
+        GetCharacterMovement()->MaxWalkSpeed *= CharacterStats.SpeedMultiplier;
+    }
+    BaseHealth *= CharacterStats.HealthMultiplier;
+    BaseDamage *= CharacterStats.DamageMultiplier;
+
+    UE_LOG(LogTemp, Log, TEXT("Character stats applied: Health = %f, Speed = %f, Damage = %f"), 
+    BaseHealth, GetCharacterMovement()->MaxWalkSpeed, BaseDamage);
 }
 
