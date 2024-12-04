@@ -9,58 +9,71 @@
 // Sets default values
 AProjectile::AProjectile()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+    // Disable Tick as it's not needed
+    PrimaryActorTick.bCanEverTick = false;
 
-	CollisionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("CollisionSphere"));
-	SetRootComponent(CollisionSphere);
-	CollisionSphere->SetCollisionObjectType(ECollisionChannel::ECC_WorldDynamic);
-	CollisionSphere->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-	CollisionSphere->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
-	CollisionSphere->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECollisionResponse::ECR_Block);
-	CollisionSphere->SetCollisionResponseToChannel(ECollisionChannel::ECC_WorldStatic, ECollisionResponse::ECR_Block);
-
-
-	ProjectileMovementComponent = CreateDefaultSubobject<UProjectileMovementComponent>("ProjectileMovementComponent");
-	ProjectileMovementComponent->bRotationFollowsVelocity = true ; // this will ensure bullet will keep rotation alligned with velocity
+    // Create and configure the collision sphere
+    CollisionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("CollisionSphere"));
+    SetRootComponent(CollisionSphere);
+    CollisionSphere->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    CollisionSphere->SetCollisionObjectType(ECC_GameTraceChannel1);
+    CollisionSphere->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
+    CollisionSphere->SetCollisionResponseToChannel(ECC_Pawn, ECollisionResponse::ECR_Overlap);
 
 
+    // Bind the OnHit function
+    CollisionSphere->OnComponentHit.AddDynamic(this, &AProjectile::OnHit);
+    // Create and configure the projectile movement component
+    ProjectileMovementComponent = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("ProjectileMovementComponent"));
+    ProjectileMovementComponent->bRotationFollowsVelocity = true;
+    ProjectileMovementComponent->bShouldBounce = false;
+    ProjectileMovementComponent->ProjectileGravityScale = 0.0f; // No gravity effect
 
-}
+    // Set default values
+    ProjectileSpeed = 3000.0f;
+    ProjectileMovementComponent->InitialSpeed = ProjectileSpeed;
+    ProjectileMovementComponent->MaxSpeed = ProjectileSpeed;
 
-void AProjectile::OnHit(UPrimitiveComponent *HitComp, AActor *OtherActor, UPrimitiveComponent *OtherComp, FVector NormalImpulse, const FHitResult &Hit)
-{
-
+    DamageAmount = 10.0f; // Example default damage
 }
 
 // Called when the game starts or when spawned
 void AProjectile::BeginPlay()
 {
-	Super::BeginPlay();
-	if(Tracer)
-	{
-		TracerSystem = UGameplayStatics::SpawnEmitterAttached(Tracer, CollisionSphere, FName(),
-		GetActorLocation(), GetActorRotation(), EAttachLocation::KeepWorldPosition);
+    Super::BeginPlay();
 
-		if (ImpactParticles)
-		{
-			UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactParticles, GetActorTransform());
-		}
-
-		if (SoundCue)
-		{
-			UGameplayStatics::PlaySoundAtLocation(this, SoundCue, GetActorLocation());
-		}
-	}
-	
+    // Spawn tracer effect if specified
+    if (Tracer)
+    {
+        TracerSystem = UGameplayStatics::SpawnEmitterAttached(Tracer, CollisionSphere);
+    }
 }
 
-// Called every frame
-void AProjectile::Tick(float DeltaTime)
+// Function called upon collision
+void AProjectile::OnHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, 
+UPrimitiveComponent* OtherComponent, FVector NormalImpulse, const FHitResult& Hit)
 {
-	Super::Tick(DeltaTime);
+    // Ensure the projectile doesn't hit itself or its owner
+    if (OtherActor && OtherActor != GetOwner())
+    {
+        // Apply damage to the hit actor
+        UGameplayStatics::ApplyDamage(OtherActor, DamageAmount, GetInstigatorController(), this, UDamageType::StaticClass());
 
+        // Spawn impact particles at the hit location
+        if (ImpactParticles)
+        {
+            UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactParticles, Hit.ImpactPoint, Hit.ImpactNormal.Rotation());
+        }
+
+        // Play impact sound at the hit location
+        if (ImpactSound)
+        {
+            UGameplayStatics::PlaySoundAtLocation(this, ImpactSound, Hit.ImpactPoint);
+        }
+
+        // Destroy the projectile after impact
+        Destroy();
+    }
 }
-
 
 

@@ -35,7 +35,9 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Animation, meta = (AllowPrivateAccess = "true"))
 	class AMainCharacter* MainCharacter;
 
-	class AWeapon* EquippedWeapon;
+	class AWeapon* playerWeapon;
+
+	// class UCombatComponent* combatComp;
 
 	class APawn* Pawn; // This variable is a reference to the pawn currently using this AnimInstance
 

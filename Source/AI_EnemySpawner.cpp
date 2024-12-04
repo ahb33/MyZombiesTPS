@@ -2,6 +2,7 @@
 
 
 #include "AI_EnemySpawner.h"
+#include "ZombiesGameMode.h"
 #include "Components/BoxComponent.h"
 
 // Sets default values
@@ -55,34 +56,31 @@ void AAI_EnemySpawner::SpawnZombies(int32 NumberOfZombies)
 
 void AAI_EnemySpawner::Spawn()
 {
-    if (ZombieSpawnCount >= TotalZombiesToSpawn) // Control spawn quantity
+    if (ZombieSpawnCount >= TotalZombiesToSpawn)
     {
         GetWorld()->GetTimerManager().ClearTimer(SpawnTimerHandle);
         return;
     }
 
     const auto ZombieClass = ZombieSpawnArray[FMath::RandRange(0, ZombieSpawnArray.Num() - 1)];
-    const auto SpawnRotation = FRotator(0.0f, FMath::RandRange(0.0f, 360.0f), 0.0f);
+    const auto SpawnRotation = FRotator::ZeroRotator;
+    const auto SpawnLocation = SpawnArea->GetComponentLocation() + FVector(
+        FMath::RandRange(-SpawnArea->GetScaledBoxExtent().X, SpawnArea->GetScaledBoxExtent().X),
+        FMath::RandRange(-SpawnArea->GetScaledBoxExtent().Y, SpawnArea->GetScaledBoxExtent().Y),
+        0.0f
+    );
 
-	const auto SpawnLocation = SpawnArea->GetComponentLocation() + FVector(
-		FMath::RandRange(-SpawnArea->GetScaledBoxExtent().X, SpawnArea->GetScaledBoxExtent().X),
-		FMath::RandRange(-SpawnArea->GetScaledBoxExtent().Y, SpawnArea->GetScaledBoxExtent().Y),
-		0.0f
-	);
-
-    // Set spawn parameters
     FActorSpawnParameters SpawnParams;
     SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
 
-    // Spawn Zombie
     if (AEnemyCharacter* SpawnedZombie = GetWorld()->SpawnActor<AEnemyCharacter>(ZombieClass, SpawnLocation, SpawnRotation, SpawnParams))
     {
-        UE_LOG(LogTemp, Log, TEXT("Spawned zombie at %s"), *SpawnLocation.ToString());
         ZombieSpawnCount++;
-    }
-    else
-    {
-    	UE_LOG(LogTemp, Warning, TEXT("Failed to spawn zombie."));
+        
+        if (AZombiesGameMode* GameMode = GetWorld()->GetAuthGameMode<AZombiesGameMode>())
+        {
+            SpawnedZombie->OnZombieDeath.AddDynamic(GameMode, &AZombiesGameMode::OnZombieKilled);
+        }
     }
 }
 

@@ -61,13 +61,15 @@ void AEnemyCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 
 }
 
-// Called to bind functionality to input
-void AEnemyCharacter::EnemyDamage(float Damage)
+
+float AEnemyCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent,
+AController* EventInstigator, AActor* DamageCauser)
 {
     if (HasAuthority()) // Ensure damage is processed only on the server
     {
-        BaseHealth -= Damage;
+        BaseHealth -= DamageAmount;
         UE_LOG(LogTemp, Warning, TEXT("Enemy BaseHealth is now: %f"), BaseHealth);
+
         if (BaseHealth <= 0.0f)
         {
             if (AnimInstanceRef)
@@ -77,23 +79,25 @@ void AEnemyCharacter::EnemyDamage(float Damage)
             GetWorld()->GetTimerManager().SetTimer(DestructionTimer, this, &AEnemyCharacter::Die, 1.0f, false);
         }
     }
+
+    return DamageAmount; // Return the actual damage applied
 }
 
 
 void AEnemyCharacter::Die()
 {
-    if (HasAuthority()) // Ensure destruction is processed only on the server
+    if (HasAuthority()) 
     {
         Destroy();
-        myGameMode = GetWorld()->GetAuthGameMode<ABaseGameMode>();
-        if (myGameMode)
+        if (OnZombieDeath.IsBound())
         {
-            myGameMode->CheckEnemiesAlive();
+            OnZombieDeath.Broadcast();
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("OnZombieDeath not bound for %s"), *GetName());
         }
     }
-
-    // Trigger the event
-    OnZombieDeath.Broadcast();
 }
 
 void AEnemyCharacter::OnRep_Health()
@@ -104,6 +108,7 @@ void AEnemyCharacter::OnRep_Health()
 void AEnemyCharacter::ApplyCharacterStats()
 {
     // Clean, consistent application of character stats
+    // apply character stats for speed and so on
     if (GetCharacterMovement())
     {
         GetCharacterMovement()->MaxWalkSpeed *= CharacterStats.SpeedMultiplier;

@@ -16,7 +16,10 @@ class MYZOMBIES_API AAssaultWeapon : public AWeapon
 	GENERATED_BODY()
 
 public:
-	virtual void Fire(const FVector& HitTarget) override;	
+
+    virtual void HandleFire(const FVector& HitTarget, const FVector& MuzzleLocation) override;
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	virtual void SetAmmo(int32 NewAmmoOnHand, int32 NewAmmoInMag) override;
 
@@ -30,38 +33,28 @@ public:
 
 	virtual void ReloadAmmo(int32 Ammo) override;
 
-	virtual float GetDamage() const override; 
+	virtual float GetDamage() const override;
 
-	void WeaponTraceHit(const FVector& TraceStart, const FVector& HitTarget, FHitResult& OutHit);
+	UFUNCTION()
+	void OnRep_AssaultWeaponAmmoOnHand();
+
+	UFUNCTION()
+	void OnRep_AssaultWeaponAmmoInMag(); 
 
 
 private:
-	UPROPERTY(EditAnywhere)
-	TSubclassOf<class AProjectile> Projectile; /*we can populate this variable with projectile or anything derived of  projectile*/
 
-	UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_AssaultWeaponAmmoOnHand)
 	int32 AssaultWeaponAmmoOnHand; // 
 
-	UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_AssaultWeaponAmmoInMag)
 	int32 AssaultWeaponAmmoInMag; // 
 
-	UPROPERTY(EditAnywhere)
-	int32 AssaultWeaponMaxAmmoOnHand; // 
+    UPROPERTY(EditAnywhere, Replicated)
+    int32 AssaultWeaponMaxAmmoOnHand;
 
-	UPROPERTY(EditAnywhere)
-	int32 AssaultWeaponMagCapacity; // 
-
-	UPROPERTY(EditAnywhere)
-	UParticleSystem* MuzzleFlash;
+    UPROPERTY(EditAnywhere, Replicated)
+    int32 AssaultWeaponMagCapacity;
 
 	FTransform SocketTransform;
-
-	UPROPERTY(EditAnywhere)
-	class UParticleSystem* ImpactParticles; // particles will be spawned if we get blocking hit
-
-	UPROPERTY(EditAnywhere)
-	float Damage;
-	
-	
-
 };

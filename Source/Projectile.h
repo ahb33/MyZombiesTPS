@@ -18,33 +18,31 @@ public:
 	// Sets default values for this actor's properties
 	AProjectile();
 
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
 
-	UPROPERTY(VisibleAnywhere, Category = Projectile)
-	class USphereComponent* CollisionSphere;
+    FORCEINLINE float GetProjectileSpeed() const { return ProjectileSpeed; } // Getter for projectile speed
 
-	UPROPERTY(EditAnywhere, Category = Projectile)
-	class UParticleSystem* Tracer;
+    UPROPERTY(VisibleAnywhere, Category = Projectile)
+    class USphereComponent* CollisionSphere;
 
-	// once we spawn this tracer we will have ability to store in system called
-	UPROPERTY(EditAnywhere, Category = Projectile)
-	UParticleSystemComponent* TracerSystem;
+    UPROPERTY(EditAnywhere, Category = Projectile)
+    class UParticleSystem* Tracer;
 
-	UPROPERTY(EditAnywhere)
-	UParticleSystem* ImpactParticles;
+    UPROPERTY(EditAnywhere, Category = Projectile)
+    UParticleSystemComponent* TracerSystem;
 
-	UPROPERTY(EditAnywhere)
-	USoundCue* SoundCue;
+    UPROPERTY(EditAnywhere)
+    UParticleSystem* ImpactParticles;
+
+    UPROPERTY(EditAnywhere)
+    USoundCue* ImpactSound;
 
 	/*We need to have some sort of hit event that will occur when projectile hits something
 	we'd like to have function called in response to a hit event*/
-	UFUNCTION()
-	virtual void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
-	FVector NormalImpulse, const FHitResult& Hit);
+    UFUNCTION()
+    virtual void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
+        FVector NormalImpulse, const FHitResult& Hit);
 
-
-
+	FORCEINLINE class UProjectileMovementComponent* GetProjectileMovementComponent() const { return ProjectileMovementComponent; }
 
 protected:
 	// Called when the game starts or when spawned
@@ -55,6 +53,13 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	class UProjectileMovementComponent* ProjectileMovementComponent;
+
+	UPROPERTY(EditAnywhere, Category = "Projectile|Movement")
+	float ProjectileSpeed;
+
+	UPROPERTY(EditAnywhere, Category = "Projectile|Movement")
+	int DamageAmount;
+
 
 
 };

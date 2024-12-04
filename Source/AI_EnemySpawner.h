@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "EnemyCharacter.h"
 #include "AI_EnemySpawner.generated.h"
 
 UCLASS()

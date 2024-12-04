@@ -42,8 +42,6 @@ private:
 	int32 CurrentLevel;
 	int32 RemainingEnemies;
 
-	ACentralCommanderAI* commanderAI;
-
 	int32 NumberOfZombiesForCurrentLevel;
 	
 };

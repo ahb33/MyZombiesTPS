@@ -46,11 +46,13 @@ public:
 	void AddCharacterStats();
 
 
+	// void AnnounceNextLevel();
+	// create NextLevel class which would create sound
 private:
 	FHUDPackage HUDPackage;
 
 	UPROPERTY(EditAnywhere)
-	float CrosshairSpreadMax = 20.f;
+	float CrosshairSpreadMax = 10.f;
 
 protected:
 
