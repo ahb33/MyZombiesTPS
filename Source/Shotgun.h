@@ -20,7 +20,8 @@ class MYZOMBIES_API AShotgun : public AWeapon
 	
 public:
 
-    virtual void HandleFire(const FVector& HitTarget, const FVector& MuzzleLocation) override;
+
+    virtual void Fire(const FVector& Hit); // Virtual for child class overrides.
 
 	// modify WaponTrace function from Assault Weapon to include scatter 
 	void WeaponTraceWithScatter(const FVector& TraceStart, const FVector& HitTarget, FHitResult& FireHit);

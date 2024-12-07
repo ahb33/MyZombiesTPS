@@ -25,10 +25,7 @@ AWeapon::AWeapon()
       ReloadAmount(0),
       AmmoInMag(0),
       MagCapacity(0),
-      WeaponState(EWeaponState::EWS_Unequipped),
-      bReloading(false),
-      bFireButtonPressed(false),
-      bCanFire(true)
+      WeaponState(EWeaponState::EWS_Unequipped)
 {
     // Enable replication and ticking
     bReplicates = true;
@@ -69,10 +66,8 @@ void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
     DOREPLIFETIME(AWeapon, MaxAmmoOnHand);
     DOREPLIFETIME(AWeapon, ReloadAmount);
     DOREPLIFETIME(AWeapon, WeaponState);
- 
-	
-
-
+    DOREPLIFETIME(AWeapon, WeaponType);
+    
 }
 // Called when the game starts or when spawned
 void AWeapon::BeginPlay()
@@ -127,19 +122,6 @@ void AWeapon::OnSphereEndOverlap(UPrimitiveComponent* OverlappedComponent, AActo
 	}
 }
 
-
-
-
-
-
-
-bool AWeapon::ShouldSwapWeapons() const
-{
-    return false;
-}
-
-
-
 void AWeapon::DropWeapon()
 {
     // Detach the weapon from the character's hand socket
@@ -152,12 +134,9 @@ void AWeapon::DropWeapon()
     ShowPickUpWidget(true);
 }
 
-
-
-
 void AWeapon::Fire(const FVector& HitTarget)
 {
-    if (WeaponIsEmpty() || !GetOwner() || !GetWeaponMesh())
+    if (!GetOwner() || !GetWeaponMesh())
     {
         UE_LOG(LogTemp, Warning, TEXT("Cannot fire: Weapon is empty or invalid owner/mesh."));
         return;
@@ -165,17 +144,12 @@ void AWeapon::Fire(const FVector& HitTarget)
     
     FVector MuzzleLocation = GetMuzzleLocation();
 
-    HandleFire(HitTarget, MuzzleLocation);
-
     SpawnMuzzleEffect(MuzzleLocation);
-}
 
-
-void AWeapon::HandleFire(const FVector& HitTarget, const FVector& MuzzleLocation)
-{
-    UE_LOG(LogTemp, Warning, TEXT("RoundFired( ) called"));
     RoundFired();
 }
+
+
 
 FVector AWeapon::GetMuzzleLocation() const
 {
@@ -229,12 +203,6 @@ void AWeapon::RoundFired()
     }
 }
 
-/*
-If on client should then you should send RPC to server so 
-that the server knows to check to make sure 
-we can reload before informing clients they can 
-reload before its time to play reload animation	
-*/
 
 void AWeapon::ShowPickUpWidget(bool bShowWidget)
 {
@@ -244,6 +212,12 @@ void AWeapon::ShowPickUpWidget(bool bShowWidget)
 	}
 }
 
+/*
+If on client should then you should send RPC to server so 
+that the server knows to check to make sure 
+we can reload before informing clients they can 
+reload before its time to play reload animation	
+*/
 
 
 void AWeapon::Reload()
@@ -272,7 +246,6 @@ void AWeapon::ServerReload_Implementation()
     // Update ammo counts
     ReloadAmmo(AmmoReload);
     RefreshHUD();
-    bReloading = true;
 
     float ReloadDuration = MainCharacter->GetReloadDuration();
     GetWorld()->GetTimerManager().SetTimer(ReloadTimerHandle, this, &AWeapon::FinishReloading, ReloadDuration, false);
@@ -290,12 +263,12 @@ void AWeapon::FinishReloading()
     {   
         UE_LOG(LogTemp, Warning, TEXT("Main Character does not have authority"));
     }
-    if (bFireButtonPressed)
-    {
-        // bool bFire = true;
-        // FireButtonPressed(bFire);
-        // UE_LOG(LogTemp, Warning, TEXT("FireButtonPressed called with bFire = true"));
-    }
+    // if (bFireButtonPressed)
+    // {
+    //     // bool bFire = true;
+    //     // FireButtonPressed(bFire);
+    //     // UE_LOG(LogTemp, Warning, TEXT("FireButtonPressed called with bFire = true"));
+    // }
 	
 	UE_LOG(LogTemp, Warning, TEXT("bReloading set to false in FinishReloading"));
 }
@@ -312,8 +285,6 @@ int32 AWeapon::AmmoToReload()
 
     return AmmoToReload;
 }
-
-
 
 void AWeapon::RefreshHUD()
 {
@@ -415,10 +386,6 @@ void AWeapon::OnRep_Owner()
         }
     }
 }
-
-
-
-
 
 void AWeapon::SetWeaponState(EWeaponState State)
 {

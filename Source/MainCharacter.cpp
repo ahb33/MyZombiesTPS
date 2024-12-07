@@ -199,31 +199,47 @@ void AMainCharacter::LookUp(float value)
 
 void AMainCharacter::EquipButtonPressed()
 {
-    if (combatComponent)
+    if(combatComponent)
     {
-        if (OverlappingWeapon)
+        if(OverlappingWeapon)
         {
-            combatComponent->EquipWeapon(OverlappingWeapon);
+            if(HasAuthority())
+            {
+                ServerEquipButtonPressed();
+            }
         }
-        else 
+        else if(!OverlappingWeapon && combatComponent->ShouldSwapWeapons())// else if no overlapping weapon is valid but equipp
         {
+            // check where combat component is even being set
             combatComponent->SwapWeapons();
         }
     }
 }
 
-
 void AMainCharacter::ServerEquipButtonPressed_Implementation()
 {
-    if (combatComponent && OverlappingWeapon)
+    // Directly call the equip logic for the server
+    if (combatComponent)
     {
-        combatComponent->EquipWeapon(OverlappingWeapon);
+        if(OverlappingWeapon)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Overlapping weapon is valid"));
+            combatComponent->EquipWeapon(OverlappingWeapon);
+
+        }
+
+        else if(combatComponent->ShouldSwapWeapons())
+        {
+            combatComponent->SwapWeapons();
+        }
+
+        UE_LOG(LogTemp, Warning, TEXT("ServerEquip function called"));
     }
 }
 
-
 void AMainCharacter::SetOverlappingWeapon(AWeapon* Weapon)
 {
+    // Prevent overlapping with the currently equipped weapon
     if (OverlappingWeapon)
     {
         OverlappingWeapon->ShowPickUpWidget(false);

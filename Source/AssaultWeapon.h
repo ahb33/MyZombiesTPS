@@ -17,7 +17,7 @@ class MYZOMBIES_API AAssaultWeapon : public AWeapon
 
 public:
 
-    virtual void HandleFire(const FVector& HitTarget, const FVector& MuzzleLocation) override;
+    virtual void Fire(const FVector& Hit); // Virtual for child class overrides.
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 

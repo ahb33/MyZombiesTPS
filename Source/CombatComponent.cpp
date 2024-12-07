@@ -8,7 +8,7 @@
 #include "Kismet/GameplayStatics.h"   
 #include "DrawDebugHelpers.h"           
 #include "Engine/World.h"      
-#include "Weapon.h"        
+#include "Weapon.h"
 #include "Engine/SkeletalMeshSocket.h"
 #include "Engine/EngineTypes.h"         
 #include "Math/UnrealMathUtility.h"
@@ -42,14 +42,15 @@ void UCombatComponent::BeginPlay()
 void UCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+    SetHUDCrosshairs(DeltaTime);
 
 	// ...
 }
 
 void UCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty> &OutLifetimeProps) const
 {
-    // DOREPLIFETIME(UCombatComponent, CombatState); /*Combat State registered for replication
-	// for all clients no need for condition*/
+    DOREPLIFETIME(UCombatComponent, CombatState); /*Combat State registered for replication
+	for all clients no need for condition*/
 
 
 	DOREPLIFETIME(UCombatComponent, bAiming);    
@@ -58,21 +59,25 @@ void UCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty> &Out
 
 }
 
-void UCombatComponent::Fire()
-{
-	// check weapon type
-}
 
 void UCombatComponent::FireButtonPressed(bool bPressed)
 {
-	// bFireButtonPressed = bPressed;
-	// if (bFireButtonPressed)
-	// {
-	// 	Fire();
-	// }
+	bFireButtonPressed = bPressed;
+	if (bFireButtonPressed)
+	{
+		Fire();
+	}
 }
 
-
+void UCombatComponent::Fire()
+{
+    if (EquippedWeapon && !EquippedWeapon->WeaponIsEmpty())
+    {
+        bCanFire = false;
+        EquippedWeapon->Fire(HitTarget);
+        // Handle firing rate and cooldown if needed
+    }
+}
 void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 {
     if (!MainCharacter || !WeaponToEquip)
@@ -81,29 +86,32 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
         return;
     }
 
-    if (!EquippedWeapon)
-    {
-        EquippedWeapon = WeaponToEquip;
-        AttachActorToRightHand(EquippedWeapon);
-        EquippedWeapon->SetOwner(MainCharacter);
+    if (CombatState != ECombatState::ECS_Unoccupied) return;
 
-    }
-    else if (!SecondaryWeapon)
+    // if no weapon is currently equipped set WeaponToEquip to value of EquippedWeapon
+    // #1 address the nulling of overlappingWeapon and #2 refactor checking for equippedweapon and so on
+
+    // if EquippedWeapon is valid but SecondaryWeapon is not equip Secondary weapon
+    if (EquippedWeapon != nullptr && SecondaryWeapon == nullptr)
     {
+
         SecondaryWeapon = WeaponToEquip;
         AttachWeaponToWeaponSocket(SecondaryWeapon);
         SecondaryWeapon->SetOwner(MainCharacter);
+        SecondaryWeapon->SetWeaponState(EWeaponState::EWS_EquippedSecondary);
+
     }
     else
     {
-        SwapWeapons();
+        
+        EquippedWeapon = WeaponToEquip;
+        AttachActorToRightHand(EquippedWeapon);
+        EquippedWeapon->SetOwner(MainCharacter);
+        EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
     }
 }
 
-void UCombatComponent::ServerEquipWeapon_Implementation(AWeapon* WeaponToEquip)
-{
-    EquipWeapon(WeaponToEquip);
-}
+
 
 void UCombatComponent::EquipSecondaryWeapon(AWeapon* WeaponToEquip)
 {
@@ -135,8 +143,17 @@ void UCombatComponent::SwapWeapons()
 
     // Attach secondary weapon to the weapon socket
     AttachWeaponToWeaponSocket(SecondaryWeapon);
+    EquippedWeapon->SetOwner(MainCharacter);
 
 }
+
+bool UCombatComponent::ShouldSwapWeapons() const
+{
+    if(EquippedWeapon && SecondaryWeapon) return true;
+
+    return false;
+}
+
 
 // 2 issues: #1 weapon not attaching #2
 void UCombatComponent::AttachActorToRightHand(AActor* ActorToAttach)
@@ -173,12 +190,6 @@ void UCombatComponent::SetAiming(bool bIsAiming)
     ServerSetAiming(bAiming);
 }
 
-
-void UCombatComponent::ServerSwapWeapons_Implementation()
-{
-    SwapWeapons();
-}
-
 void UCombatComponent::ServerSetAiming_Implementation(bool bIsAiming)
 {
 	bAiming = bIsAiming;
@@ -192,6 +203,58 @@ void UCombatComponent::OnRep_Aiming()
 	}
 }
 
+void UCombatComponent::SetCombatState(ECombatState State)
+{
+    CombatState = State;
+    OnRep_CombatState();
+}
 
+void UCombatComponent::OnRep_CombatState()
+{
+    if (!MainCharacter) return;
 
+    switch (CombatState)
+    {
+        case ECombatState::ECS_Unoccupied:
+            MainCharacter->GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+            break;
 
+        case ECombatState::ECS_Reloading:
+            MainCharacter->GetCharacterMovement()->DisableMovement();
+            break;
+
+        case ECombatState::ECS_Equipping:
+            break;
+
+        default:
+            break;
+    }
+}
+
+void UCombatComponent::SetHUDCrosshairs(float DeltaTime)
+{
+    if (!MainCharacter) return;
+
+    AMyPlayerController* PlayerController = Cast<AMyPlayerController>(MainCharacter->GetController());
+    if (!PlayerController) return;
+
+    HUD = HUD ? HUD : Cast<AMyHUD>(PlayerController->GetHUD());
+    if (!HUD) return;
+
+    HUDPackage.CrosshairsCenter = this->CrosshairsCenter;
+    HUDPackage.CrosshairsLeft = this->CrosshairsLeft;
+    HUDPackage.CrosshairsRight = this->CrosshairsRight;
+    HUDPackage.CrosshairsTop = this->CrosshairsTop;
+    HUDPackage.CrosshairsBottom = this->CrosshairsBottom;
+
+    FVector2D SpeedRange(0.f, MainCharacter->GetCharacterMovement()->MaxWalkSpeed);
+    FVector2D VelocityRange(0.f, 1.f);
+    FVector Velocity = MainCharacter->GetVelocity();
+    Velocity.Z = 0.f;
+
+    CrosshairVelocityFactor = FMath::GetMappedRangeValueClamped(SpeedRange, VelocityRange, Velocity.Size());
+    HUDPackage.CrosshairSpread = 0.0f + CrosshairVelocityFactor; // Adjusted base value
+
+    HUD->SetHUDPackage(HUDPackage);
+    
+}

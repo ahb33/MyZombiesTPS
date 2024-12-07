@@ -23,26 +23,31 @@ void AShotgun::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetime
     DOREPLIFETIME(AShotgun, ShotgunMagCapacity);
 }
 
-void AShotgun::HandleFire(const FVector& HitTarget, const FVector& MuzzleLocation)
+// void AShotgun::HandleFire(const FVector& HitTarget, const FVector& MuzzleLocation)
+// {
+//     Super::HandleFire(HitTarget, MuzzleLocation);
+
+//     const int32 NumPellets = 10;
+
+//     for (int32 i = 0; i < NumPellets; ++i)
+//     {
+//         FHitResult FireHit;
+//         FVector EndPoint = CalculateScatterEndPoint(MuzzleLocation, HitTarget);
+//         WeaponTraceWithScatter(MuzzleLocation, EndPoint, FireHit);
+
+//         if (FireHit.bBlockingHit)
+//         {
+//             DealDamage(FireHit);
+//         }
+//     }
+// }
+
+void AShotgun::Fire(const FVector &Hit)
 {
-    Super::HandleFire(HitTarget, MuzzleLocation);
-
-    const int32 NumPellets = 10;
-
-    for (int32 i = 0; i < NumPellets; ++i)
-    {
-        FHitResult FireHit;
-        FVector EndPoint = CalculateScatterEndPoint(MuzzleLocation, HitTarget);
-        WeaponTraceWithScatter(MuzzleLocation, EndPoint, FireHit);
-
-        if (FireHit.bBlockingHit)
-        {
-            DealDamage(FireHit);
-        }
-    }
+    
 }
 
-void AShotgun::WeaponTraceWithScatter(const FVector& TraceStart, const FVector& EndPoint, FHitResult& FireHit)
+void AShotgun::WeaponTraceWithScatter(const FVector &TraceStart, const FVector &EndPoint, FHitResult &FireHit)
 {
     UWorld* World = GetWorld();
     if (World)

@@ -43,7 +43,6 @@ public:
     void DropWeapon();
 
     /** HUD and Crosshair */
-    void SetHUDCrosshairs(float DeltaTime);
     void RefreshHUD();
     void SetHUDAmmo(int32 Ammo);
     void SetHUDMagAmmo(int32 MagAmmo);
@@ -81,7 +80,6 @@ public:
 
     /** Utilities */
     bool WeaponIsEmpty() const;
-    bool ShouldSwapWeapons() const;
 	// Useful for accessing the actual mesh of the weapon itself
 	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh() const {return WeaponMesh;}
     void SetWeaponState(EWeaponState NewState);
@@ -108,8 +106,6 @@ protected:
 
     /** Lifecycle */
     virtual void BeginPlay() override;
-
-    virtual void HandleFire(const FVector& HitTarget, const FVector& MuzzleLocation);
 
     /** Overlap Events */
     UFUNCTION()
@@ -169,11 +165,6 @@ private:
 
     UPROPERTY(ReplicatedUsing = OnRep_WeaponState)
     EWeaponState WeaponState = EWeaponState::EWS_Unequipped;
-
-    /** Other Utility Variables */
-    bool bReloading; // Indicates if the weapon is reloading.
-    bool bFireButtonPressed;
-    bool bCanFire = true; // True when the weapon can fire.
 
     /** Casing and Effects */
     UPROPERTY(EditAnywhere, Category = Casing)

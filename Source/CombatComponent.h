@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "MyHUD.h"
-#include "CombatState.h"
+#include "CombatState.h"       
 #include "CombatComponent.generated.h"
 
 
@@ -38,18 +38,18 @@ public:
     void AttachWeaponToWeaponSocket(AActor* WeaponToAttach);
 	class AWeapon* GetEquippedWeapon() const { return EquippedWeapon; }
     void SetAiming(bool bIsAiming);
+    bool ShouldSwapWeapons() const;
+    void SetCombatState(ECombatState State);
+    ECombatState GetCombatState() const { return CombatState; }
 
+    UFUNCTION()
+    void OnRep_CombatState();
+
+    void SetHUDCrosshairs(float DeltaTime);
 
 
 protected:
     virtual void BeginPlay() override;
-
-    // Server Functions
-    UFUNCTION(Server, Reliable)
-    void ServerEquipWeapon(AWeapon* WeaponToEquip);
-
-    UFUNCTION(Server, Reliable)
-    void ServerSwapWeapons();
 
     UFUNCTION(Server, Reliable)
     void ServerSetAiming(bool bIsAiming);
@@ -100,9 +100,11 @@ private:
 
     FVector LocalHitTarget;
 
-    // UPROPERTY(ReplicatedUsing = OnRep_CombatState)
-    // ECombatState CombatState;
+    UPROPERTY(ReplicatedUsing = OnRep_CombatState)
+    ECombatState CombatState;
 
-    // Fire Control
+    /** Other Utility Variables */
+    bool bCanFire; // Indicates if the weapon is reloading.
     bool bFireButtonPressed;
+
 };
