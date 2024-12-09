@@ -8,7 +8,6 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "WeaponState.h"
-#include "WeaponTypes.h"
 #include "MyHUD.h"
 #include "Delegates/DelegateCombinations.h"
 #include "Casing.h"
@@ -43,6 +42,7 @@ public:
     void DropWeapon();
 
     /** HUD and Crosshair */
+    void SetHUDCrosshairs(float DeltaTime);
     void RefreshHUD();
     void SetHUDAmmo(int32 Ammo);
     void SetHUDMagAmmo(int32 MagAmmo);
@@ -80,12 +80,15 @@ public:
 
     /** Utilities */
     bool WeaponIsEmpty() const;
+    bool ShouldSwapWeapons() const;
 	// Useful for accessing the actual mesh of the weapon itself
 	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh() const {return WeaponMesh;}
+	void SetAiming(bool bIsAiming);
+	void InitializeCharacterAndController();
     void SetWeaponState(EWeaponState NewState);
-    EWeaponType GetWeaponType() const {return WeaponType;}
     EWeaponState GetWeaponState() const { return WeaponState; }
-    virtual void SetOwner(AActor* NewOwner) override;
+
+
 
 
     /** Replication */
@@ -100,12 +103,16 @@ public:
 
     /** Server Functions */
     UFUNCTION(Server, Reliable)
+    void ServerSetAiming(bool bIsAiming);
+    UFUNCTION(Server, Reliable)
     void ServerReload();
 
 protected:
 
     /** Lifecycle */
     virtual void BeginPlay() override;
+
+    virtual void HandleFire(const FVector& HitTarget, const FVector& MuzzleLocation);
 
     /** Overlap Events */
     UFUNCTION()
@@ -128,11 +135,11 @@ private:
 
     /** Core Components */
     UPROPERTY(VisibleAnywhere, Category = Weapon)
-    class USphereComponent* AreaSphere;
+    USphereComponent* AreaSphere;
 
     UPROPERTY(VisibleAnywhere, Category = Weapon)
-    class UWidgetComponent* PickupWidget;
-    
+    UWidgetComponent* PickupWidget;
+
     UPROPERTY(BlueprintReadWrite, VisibleAnywhere, Category = Weapon, meta = (AllowPrivateAccess = "true"))
     USkeletalMeshComponent* WeaponMesh;
 
@@ -143,6 +150,11 @@ private:
     /** Player and Character References */
     UPROPERTY()
     class AMainCharacter* MainCharacter; // Access to MainCharacter functions.
+
+
+    /** Replicated States */
+    UPROPERTY(Replicated)
+    bool bAiming;
 
     UPROPERTY(ReplicatedUsing = OnRep_AmmoOnHand)
     int32 AmmoOnHand; // Current ammo available for the weapon.
@@ -160,11 +172,15 @@ private:
     UPROPERTY()
     int32 MagCapacity; // Maximum magazine capacity.
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "Combat", meta = (AllowPrivateAccess = "true")) 
-    EWeaponType WeaponType;
+
 
     UPROPERTY(ReplicatedUsing = OnRep_WeaponState)
     EWeaponState WeaponState = EWeaponState::EWS_Unequipped;
+
+    /** Other Utility Variables */
+    bool bReloading; // Indicates if the weapon is reloading.
+    bool bFireButtonPressed;
+    bool bCanFire = true; // True when the weapon can fire.
 
     /** Casing and Effects */
     UPROPERTY(EditAnywhere, Category = Casing)

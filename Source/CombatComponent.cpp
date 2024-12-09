@@ -8,8 +8,7 @@
 #include "Kismet/GameplayStatics.h"   
 #include "DrawDebugHelpers.h"           
 #include "Engine/World.h"      
-#include "Weapon.h"
-#include "Engine/SkeletalMeshSocket.h"
+#include "Weapon.h"         
 #include "Engine/EngineTypes.h"         
 #include "Math/UnrealMathUtility.h"
 #include "GameFramework/CharacterMovementComponent.h" 
@@ -38,11 +37,12 @@ void UCombatComponent::BeginPlay()
 }
 
 
+
+
 // Called every frame
 void UCombatComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-    SetHUDCrosshairs(DeltaTime);
 
 	// ...
 }
@@ -59,25 +59,21 @@ void UCombatComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty> &Out
 
 }
 
+void UCombatComponent::Fire()
+{
+	// check weapon type
+}
 
 void UCombatComponent::FireButtonPressed(bool bPressed)
 {
-	bFireButtonPressed = bPressed;
-	if (bFireButtonPressed)
-	{
-		Fire();
-	}
+	// bFireButtonPressed = bPressed;
+	// if (bFireButtonPressed)
+	// {
+	// 	Fire();
+	// }
 }
 
-void UCombatComponent::Fire()
-{
-    if (EquippedWeapon && !EquippedWeapon->WeaponIsEmpty())
-    {
-        bCanFire = false;
-        EquippedWeapon->Fire(HitTarget);
-        // Handle firing rate and cooldown if needed
-    }
-}
+
 void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
 {
     if (!MainCharacter || !WeaponToEquip)
@@ -86,7 +82,7 @@ void UCombatComponent::EquipWeapon(AWeapon* WeaponToEquip)
         return;
     }
 
-    if (CombatState != ECombatState::ECS_Unoccupied) return;
+    // if (CombatState != ECombatState::ECS_Unoccupied) return;
 
     // if no weapon is currently equipped set WeaponToEquip to value of EquippedWeapon
     // #1 address the nulling of overlappingWeapon and #2 refactor checking for equippedweapon and so on
@@ -229,32 +225,4 @@ void UCombatComponent::OnRep_CombatState()
         default:
             break;
     }
-}
-
-void UCombatComponent::SetHUDCrosshairs(float DeltaTime)
-{
-    if (!MainCharacter) return;
-
-    AMyPlayerController* PlayerController = Cast<AMyPlayerController>(MainCharacter->GetController());
-    if (!PlayerController) return;
-
-    HUD = HUD ? HUD : Cast<AMyHUD>(PlayerController->GetHUD());
-    if (!HUD) return;
-
-    HUDPackage.CrosshairsCenter = this->CrosshairsCenter;
-    HUDPackage.CrosshairsLeft = this->CrosshairsLeft;
-    HUDPackage.CrosshairsRight = this->CrosshairsRight;
-    HUDPackage.CrosshairsTop = this->CrosshairsTop;
-    HUDPackage.CrosshairsBottom = this->CrosshairsBottom;
-
-    FVector2D SpeedRange(0.f, MainCharacter->GetCharacterMovement()->MaxWalkSpeed);
-    FVector2D VelocityRange(0.f, 1.f);
-    FVector Velocity = MainCharacter->GetVelocity();
-    Velocity.Z = 0.f;
-
-    CrosshairVelocityFactor = FMath::GetMappedRangeValueClamped(SpeedRange, VelocityRange, Velocity.Size());
-    HUDPackage.CrosshairSpread = 0.0f + CrosshairVelocityFactor; // Adjusted base value
-
-    HUD->SetHUDPackage(HUDPackage);
-    
 }

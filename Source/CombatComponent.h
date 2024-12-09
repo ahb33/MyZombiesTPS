@@ -5,7 +5,8 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "MyHUD.h"
-#include "CombatState.h"       
+#include "WeaponTypes.h"
+#include "CombatState.h"
 #include "CombatComponent.generated.h"
 
 
@@ -29,46 +30,41 @@ public:
 	void Fire();
 
 		/** Weapon Equipping */
-	void EquipWeapon(class AWeapon*);
-	void EquipSecondaryWeapon(class AWeapon*);
+	void EquipWeapon(AWeapon* NewWeapon);
+	void EquipPrimaryWeapon(AWeapon* PrimaryWeapon);
+	void EquipSecondaryWeapon(AWeapon* Character);
 	void SwapWeapons();
 
 	/** Utilities */
     void AttachActorToRightHand(AActor* ActorToAttach);
     void AttachWeaponToWeaponSocket(AActor* WeaponToAttach);
-	class AWeapon* GetEquippedWeapon() const { return EquippedWeapon; }
-    void SetAiming(bool bIsAiming);
-    bool ShouldSwapWeapons() const;
-    void SetCombatState(ECombatState State);
-    ECombatState GetCombatState() const { return CombatState; }
+	AWeapon* GetEquippedWeapon() const { return PrimaryWeapon; }
+    EWeaponType GetWeaponType() const {return WeaponType;}
 
-    UFUNCTION()
-    void OnRep_CombatState();
-
-    void SetHUDCrosshairs(float DeltaTime);
 
 
 protected:
-    virtual void BeginPlay() override;
-
-    UFUNCTION(Server, Reliable)
-    void ServerSetAiming(bool bIsAiming);
-
-    // Replication
-    UFUNCTION()
-    void OnRep_Aiming();
+	// Called when the game starts
+	virtual void BeginPlay() override;
 
 private:	
+
 
     // Weapon References
     UPROPERTY(Replicated)
     class AWeapon* EquippedWeapon;
 
     UPROPERTY(Replicated)
+    class AWeapon* PrimaryWeapon;
+
+    UPROPERTY(Replicated)
     class AWeapon* SecondaryWeapon;
 
     // Character and Controller References
+    UPROPERTY()
     class AMainCharacter* MainCharacter;
+
+    UPROPERTY()
     class AMyPlayerController* Controller;
 
     UPROPERTY()
@@ -95,16 +91,15 @@ private:
     UPROPERTY(EditAnywhere, Category = Crosshairs)
     UTexture2D* CrosshairsBottom;
 
-    UPROPERTY(ReplicatedUsing = OnRep_Aiming)
-    bool bAiming;
+    // Weapon State and Aiming
+    UPROPERTY(Replicated, EditAnywhere, Category = "Weapon Type")
+    EWeaponType WeaponType;
 
     FVector LocalHitTarget;
 
-    UPROPERTY(ReplicatedUsing = OnRep_CombatState)
-    ECombatState CombatState;
+    // UPROPERTY(ReplicatedUsing = OnRep_CombatState)
+    // ECombatState CombatState;
 
-    /** Other Utility Variables */
-    bool bCanFire; // Indicates if the weapon is reloading.
+    // Fire Control
     bool bFireButtonPressed;
-
 };
