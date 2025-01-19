@@ -3,12 +3,14 @@
 
 #include "Weapon.h"
 #include "Components/SphereComponent.h"
-#include "MainCharacter.h"
 #include "Engine/SkeletalMeshSocket.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "Math/UnrealMathUtility.h" 
 #include "WeaponTypes.h"
+#include "MyHUD.h"
+#include "MyPlayerController.h"
+#include "DrawDebugHelpers.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/CharacterMovementComponent.h" 
 #include "Components/WidgetComponent.h"
@@ -17,31 +19,39 @@
 
 // Sets default values
 AWeapon::AWeapon()
+    : bAiming(false),
+      AmmoOnHand(0),
+      MaxAmmoOnHand(0),
+      ReloadAmount(0),
+      AmmoInMag(0),
+      MagCapacity(0),
+      WeaponState(EWeaponState::EWS_Unequipped),
+      bReloading(false),
+      bFireButtonPressed(false),
+      bCanFire(true)
 {
-	bReplicates = true;
-	SetReplicateMovement(true);
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+    // Enable replication and ticking
+    bReplicates = true;
+    SetReplicateMovement(true);
+    PrimaryActorTick.bCanEverTick = true;
 
-	WeaponMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("WeaponMesh"));
-	SetRootComponent(WeaponMesh); // sets the WeaponMesh variable to be the root component
+    // Weapon Mesh initialization
+    WeaponMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("WeaponMesh"));
+    SetRootComponent(WeaponMesh); // Set WeaponMesh as root component.
+    WeaponMesh->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Block);
+    WeaponMesh->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Ignore);
+    WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	WeaponMesh->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Block);
-	WeaponMesh->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Ignore); /*
-	if you want the pawn to run through the weapon without colliding with it */
-	WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    // Area Sphere initialization
+    AreaSphere = CreateDefaultSubobject<USphereComponent>(TEXT("AreaSphere"));
+    AreaSphere->SetupAttachment(RootComponent);
+    AreaSphere->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
+    AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	AreaSphere = CreateDefaultSubobject<USphereComponent>(TEXT("AreaSphere"));
-	AreaSphere->SetupAttachment(RootComponent); // attaches Area sphere to Weapon Mesh
-	AreaSphere->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore); /*Disable collision
-	fore area sphere in constructor but enable it in begin play for the server */
-	AreaSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-
-	PickupWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("PickupWidget"));
-	PickupWidget->SetupAttachment(RootComponent);
-
-
-
+    // Pickup Widget initialization
+    PickupWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("PickupWidget"));
+    PickupWidget->SetupAttachment(RootComponent);
+    PickupWidget->SetVisibility(false);
 }
 
 void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -56,20 +66,12 @@ void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 	DOREPLIFETIME_CONDITION(AWeapon, AmmoOnHand, COND_OwnerOnly);  // Ammo will only replicate to owning client
 
 	DOREPLIFETIME_CONDITION(AWeapon, AmmoInMag, COND_OwnerOnly);
-	DOREPLIFETIME(AWeapon, CombatState); /*Combat State registered for replication
-	for all clients no need for condition*/
 
-	DOREPLIFETIME(AWeapon, EquippedWeapon);
-	DOREPLIFETIME(AWeapon, SecondaryWeapon);
-	DOREPLIFETIME(AWeapon, PlayerCharacter);
-    DOREPLIFETIME(AWeapon, PrimaryWeapon);
     DOREPLIFETIME(AWeapon, MaxAmmoOnHand);
     DOREPLIFETIME(AWeapon, ReloadAmount);
     DOREPLIFETIME(AWeapon, WeaponState);
-	DOREPLIFETIME(AWeapon, CombatState);
+ 
 	
-
-
 
 
 }
@@ -91,26 +93,6 @@ void AWeapon::BeginPlay()
 		PickupWidget->SetVisibility(false);
 	}
 	
-	// Find the player's character in the world by iterating over all instances of the AMainCharacter class,
-	// and store a pointer to the first one found in the MainCharacter variable.
-	// This is necessary because some of the subsequent code requires a reference to the player's character.
-	// delete this approach- not suitable for multiplayer
-	for (TActorIterator<AMainCharacter> ActorItr(GetWorld()); ActorItr; ++ActorItr)
-	{
-		MainCharacter = *ActorItr;
-		break;
-	}
-	// Get the controller of the MainCharacter
-	AController* Controller = MainCharacter->GetController();
-	// modify for multiplayer
-	AMyPlayerController* MyController = Cast<AMyPlayerController>(UGameplayStatics::GetPlayerController(this, 0));
-
-	if(!MyController)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Failed to retrieve player controller"));
-		return;
-	}
-
     if(HasAuthority())
     {
         SetAmmoInMag();
@@ -122,11 +104,6 @@ void AWeapon::BeginPlay()
 void AWeapon::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
-	FHitResult HitResult;
-	CrossHairTrace(HitResult);
-
-	SetHUDCrosshairs(DeltaTime);
 
 
 }				
@@ -149,7 +126,31 @@ void AWeapon::OnSphereEndOverlap(UPrimitiveComponent* OverlappedComponent, AActo
 	{
 		LocalMainCharacter->SetOverlappingWeapon(nullptr);
 	}
+}
 
+void AWeapon::InitializeCharacterAndController()
+{
+    AActor* OwnerActor = GetOwner();
+    if (!OwnerActor)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("AWeapon::InitializeCharacterAndController - Owner is null"));
+        return;
+    }
+
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("OwnerActor is valid"));
+    }
+
+    MainCharacter = Cast<AMainCharacter>(OwnerActor);
+    if (!MainCharacter)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("AWeapon::InitializeCharacterAndController - MainCharacter is null"));
+        return;
+    }
+
+    // Ensure HUD updates for the owning player
+    RefreshHUD();
 }
 
 
@@ -161,206 +162,81 @@ void AWeapon::OnSphereEndOverlap(UPrimitiveComponent* OverlappedComponent, AActo
 // 	}
 // }
 
-void AWeapon::EquipWeapon(class AWeapon* currentWeapon)
-{
-
-	if (!MainCharacter)
-	{
-		return;
-	}
-
-	/*
-		If weapon is already equipped, equip secondary weapon else equip primary weapon else if both
-		primary and secondary weapons are equipped then swap weapons
-	*/
-
-	// if no primary weapon is equipped, EquipSecondary
-	// if secondary weapon is equipped, EquipPrimary
-	// else swap weapon
-
-    // If there's no primary weapon equipped, equip this one as primary.
-    if (!EquippedWeapon)
-    {
-        EquipPrimaryWeapon(currentWeapon);
-    }
-    // If the primary weapon is equipped and the secondary is not, and the current weapon is not the same as the primary weapon, equip as secondary.
-    else if (!SecondaryWeapon && EquippedWeapon != currentWeapon)
-    {
-        EquipSecondaryWeapon(currentWeapon);
-    }
-    // If both primary and secondary weapons are equipped, swap them.
-    else if (EquippedWeapon && SecondaryWeapon)
-    {
-        SwapWeapons();
-    }
-
-}
-
-void AWeapon::EquipPrimaryWeapon(class AWeapon* FirstWeapon)
-{
-	if(FirstWeapon == nullptr) return;
-	EquippedWeapon = FirstWeapon;
-	WeaponState = EWeaponState::EWS_Equipped;
-    EquippedWeapon->SetOwner(MainCharacter);
-    EquippedWeapon->ShowPickUpWidget(false);
-
-    const USkeletalMeshSocket* HandSocket = MainCharacter->GetMesh()->GetSocketByName(FName("RightHandSocket"));
-    if (HandSocket) HandSocket->AttachActor(EquippedWeapon, MainCharacter->GetMesh());
 
 
-	//    // Assuming SetAmmoOnHand is setting the ammo counts properly
-	//     EquippedWeapon->SetAmmoOnHand();
 
-	//     // Make sure to update the HUD after the weapon is equipped and ammo is set
-	//     EquippedWeapon->RefreshHUD();
-	
-	EquippedWeapon->RefreshHUD();
-
-
-    SetHUDCrosshairs(0.f);
-}
-
-void AWeapon::EquipSecondaryWeapon(class AWeapon* SecondWeapon)
-{
-	if(SecondWeapon == nullptr) return;
-	SecondaryWeapon = SecondWeapon;
-	SecondaryWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
-	AttachWeaponToWeaponSocket(SecondaryWeapon);
-	SecondaryWeapon->SetOwner(MainCharacter);
-	// Assuming SetAmmoOnHand is setting the ammo counts properly
-    EquippedWeapon->SetAmmoOnHand();
-
-
-	
-}
-
-// register for replicatrion
-void AWeapon::SwapWeapons()
-{
-	UE_LOG(LogTemp, Warning, (TEXT("SwapWeapons called")));
-	AWeapon* TempWeapon = EquippedWeapon;
-	EquippedWeapon = SecondaryWeapon;
-	SecondaryWeapon = TempWeapon;
-
-	EquippedWeapon->SetWeaponState(EWeaponState::EWS_Equipped);
-	AttachActorToRightHand(EquippedWeapon);
-
-	EquippedWeapon->RefreshHUD();
-
-	AttachWeaponToWeaponSocket(SecondaryWeapon);
-
-}
 
 bool AWeapon::ShouldSwapWeapons() const
 {
-	return(EquippedWeapon != nullptr && SecondaryWeapon != nullptr);
+    return false;
 }
 
-void AWeapon::AttachActorToRightHand(AActor* ActorToAttach)
-{
-	if (MainCharacter == nullptr || MainCharacter->GetMesh() == nullptr || ActorToAttach == nullptr) return;
-	const USkeletalMeshSocket* HandSocket = MainCharacter->GetMesh()->GetSocketByName(FName("RightHandSocket"));
-	if (HandSocket)
-	{
-		HandSocket->AttachActor(ActorToAttach, MainCharacter->GetMesh());
-	}
-}
-
-void AWeapon::AttachWeaponToWeaponSocket(AActor* WeaponToAttach)
-{
-	// check if character or weapon to attach are nullptr
-	// create and define const ref to USkeletalMeshSocket 
-	// check if ref is valid
-	// AttachActor 
-	if(MainCharacter == nullptr || MainCharacter->GetMesh() == nullptr || WeaponToAttach == nullptr) return;
-	const USkeletalMeshSocket* WeaponSocket  = MainCharacter->GetMesh()->GetSocketByName(FName("SecondaryWeaponSocket"));
-	if(WeaponSocket)
-	{
-		WeaponSocket ->AttachActor(WeaponToAttach, MainCharacter->GetMesh());
-	}
-}
 
 
 void AWeapon::DropWeapon()
 {
-	if(EquippedWeapon)
-	{
-		// Detach the weapon from the character's hand socket
-		EquippedWeapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+    // Detach the weapon from the character's hand socket
+    DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 
-		// Set the weapon's owner to nullptr
-		EquippedWeapon->SetOwner(nullptr);
+    // Set the weapon's owner to nullptr
+    SetOwner(nullptr);
 
-		// Show the pickup widget for the dropped weapon
-		EquippedWeapon->ShowPickUpWidget(true);
-
-		// Clear the equipped weapon reference
-		EquippedWeapon = nullptr;
-	}
+    // Show the pickup widget for the dropped weapon
+    ShowPickUpWidget(true);
 }
 
 
 
-void AWeapon::FireButtonPressed(bool bFire)
+
+void AWeapon::Fire(const FVector& HitTarget)
 {
-	bFireButtonPressed = bFire;
-	if(EquippedWeapon == nullptr) return;
-	if (MainCharacter && bFireButtonPressed)
-	{
-		FHitResult TraceHitResult;
-		FVector HitTarget = CrossHairTrace(TraceHitResult);
-
-		if(HitTarget!= FVector::ZeroVector)
-		{  
-			EquippedWeapon->Fire(HitTarget);
-
-		}
-	}
-}
-
-void AWeapon::Fire(const FVector& Hit)
-{	
-    if (!WeaponIsEmpty())
+    if (WeaponIsEmpty() || !GetOwner() || !GetWeaponMesh())
     {
-        RoundFired();
-        bCanFire = false;
-
-		// If Animation is valid and CombatState unoccupied then play animation and montage
-        if (FireAnim)
-        {
-            WeaponMesh->PlayAnimation(FireAnim, false);
-            MainCharacter->PlayFireMontage(bAiming);
-        }
-
-        if (Casing)
-        {
-            const USkeletalMeshSocket* CasingSocket = WeaponMesh->GetSocketByName(FName("AmmoEject"));
-            if (CasingSocket)
-            {
-                FTransform CasingMeshTransform = CasingSocket->GetSocketTransform(WeaponMesh);
-                UWorld* World = GetWorld();
-                if (World)
-                {
-                    World->SpawnActor<ACasing>(Casing, CasingMeshTransform.GetLocation(), CasingMeshTransform.GetRotation().Rotator());
-                }
-            }
-        }
-    }
-    else
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Weapon Cannot Fire while reloading"));
-        // Unable to fire weapon
+        UE_LOG(LogTemp, Warning, TEXT("Cannot fire: Weapon is empty or invalid owner/mesh."));
         return;
     }
-	
+    
+    FVector MuzzleLocation = GetMuzzleLocation();
+
+    HandleFire(HitTarget, MuzzleLocation);
+
+    SpawnMuzzleEffect(MuzzleLocation);
 }
 
-/*
-	Function should decrement ammo everytime you fire
-	Function should check if weapon has valid owner
-	Function should make sure ammo count doesn't go below 0
 
-*/
+void AWeapon::HandleFire(const FVector& HitTarget, const FVector& MuzzleLocation)
+{
+    UE_LOG(LogTemp, Warning, TEXT("RoundFired( ) called"));
+    RoundFired();
+}
+
+FVector AWeapon::GetMuzzleLocation() const
+{
+    const USkeletalMeshSocket* MuzzleSocket = GetWeaponMesh()->GetSocketByName(FName("MuzzleFlash"));
+    return MuzzleSocket ? MuzzleSocket->GetSocketLocation(GetWeaponMesh()) : FVector::ZeroVector;
+}
+
+void AWeapon::SpawnMuzzleEffect(const FVector& MuzzleLocation)
+{
+    if (MuzzleFlash)
+    {
+        UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), MuzzleFlash, MuzzleLocation);
+    }
+}
+
+void AWeapon::DealDamage(const FHitResult &HitResult)
+{
+    if (AActor* HitActor = HitResult.GetActor())
+    {
+        UGameplayStatics::ApplyDamage(
+            HitActor,
+            GetDamage(),
+            GetOwner()->GetInstigatorController(),
+            this,
+            UDamageType::StaticClass()
+        );
+    }
+}
 
 bool AWeapon::WeaponIsEmpty() const
 {
@@ -373,6 +249,7 @@ void AWeapon::RoundFired()
 
     if (CurrentAmmoOnHand > 0) 
     {
+        UE_LOG(LogTemp, Warning, TEXT("RoundFired called"));
         // Reduce the ammo count in the specific weapon instance
         SetAmmo(CurrentAmmoOnHand - 1, GetCurrentAmmoInMag());
 
@@ -381,11 +258,7 @@ void AWeapon::RoundFired()
     } 
     else
     {
-		// check if weapon is empty and log it
-		if(WeaponIsEmpty())
-		{
-			UE_LOG(LogTemp, Warning, TEXT("Weapon is out of ammo"));
-		}
+        UE_LOG(LogTemp, Warning, TEXT("Weapon is out of ammo"));
     }
 }
 
@@ -423,45 +296,34 @@ void AWeapon::ServerSetAiming_Implementation(bool bIsAiming)
 }
 
 void AWeapon::Reload()
-{
+{    
+    UE_LOG(LogTemp, Warning, TEXT("Reload() function called"));
 
-	UE_LOG(LogTemp, Warning, TEXT("Reload() function called"));
-	
-	// Check if ammo is greater than 0 and Combat State is not reloading 
-	if(EquippedWeapon && EquippedWeapon->AmmoInMag > 0) 
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Calling 2 reload functions"));
-		ServerReload();
-	}
+    // Check if ammo is greater than 0
+    if (AmmoInMag > 0)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Calling reload functions"));
+        ServerReload();
+    }
 }
 
 void AWeapon::ServerReload_Implementation()
 {
+    UE_LOG(LogTemp, Warning, TEXT("Server Reload function called"));
 
-	UE_LOG(LogTemp, Warning, TEXT("Server Reload function called"));
+    if (MainCharacter == nullptr) return;
 
-	// Check If MainCharacter or equipped weapon is nullptr
-	// Play Reload Montage
-	// Use FMath Clamp to make clamp ammo between 0 and value between ammo in Mag and Mag capacity
-	if(MainCharacter == nullptr || EquippedWeapon == nullptr) return;
-
-    CombatState = ECombatState::ECS_Reloading;
 
     MainCharacter->PlayReloadMontage();
 
-    int32 AmmoReload = AmmoToReload(); // Calculate the ammo to reload
+    int32 AmmoReload = AmmoToReload();
 
-    // Use the GetCurrentAmmoOnHand and GetCurrentAmmoInMag methods to get the correct ammo values
-    // Use a new method or directly call a method on the EquippedWeapon to update its ammo counts
-    EquippedWeapon->ReloadAmmo(AmmoReload);
-	EquippedWeapon->RefreshHUD();
-	bReloading = true;
-	
-	UE_LOG(LogTemp, Warning, TEXT("bReloading set to true in ServerReload"));
+    // Update ammo counts
+    ReloadAmmo(AmmoReload);
+    RefreshHUD();
+    bReloading = true;
 
-	
-    // Set a timer to call FinishReloading after the duration of the reload animation
-    float ReloadDuration = MainCharacter->GetReloadDuration(); // Make sure this function is implemented to get the duration of the reload montage
+    float ReloadDuration = MainCharacter->GetReloadDuration();
     GetWorld()->GetTimerManager().SetTimer(ReloadTimerHandle, this, &AWeapon::FinishReloading, ReloadDuration, false);
 }
 
@@ -469,37 +331,30 @@ void AWeapon::FinishReloading()
 {
     UE_LOG(LogTemp, Warning, TEXT("FinishReloading() function called"));
     if (MainCharacter == nullptr) 
-    {
+    {   
         UE_LOG(LogTemp, Warning, TEXT("MainCharacter is nullptr"));
         return;
-    }
+    }   
     if (MainCharacter->HasAuthority())
-    {
-        CombatState = ECombatState::ECS_Unoccupied;
-        UE_LOG(LogTemp, Warning, TEXT("CombatState set to ECS_Unoccupied"));
+    {   
+        UE_LOG(LogTemp, Warning, TEXT("Main Character does not have authority"));
     }
     if (bFireButtonPressed)
     {
-        bool bFire = true;
-        FireButtonPressed(bFire);
-        UE_LOG(LogTemp, Warning, TEXT("FireButtonPressed called with bFire = true"));
+        // bool bFire = true;
+        // FireButtonPressed(bFire);
+        // UE_LOG(LogTemp, Warning, TEXT("FireButtonPressed called with bFire = true"));
     }
-
-	bReloading = false;
+	
 	UE_LOG(LogTemp, Warning, TEXT("bReloading set to false in FinishReloading"));
 }
 
 
 int32 AWeapon::AmmoToReload()
 {
-    if(EquippedWeapon == nullptr) 
-    {
-        return 0;
-    }
-
-    int32 CurrentAmmoOnHand = EquippedWeapon->GetCurrentAmmoOnHand();
-    int32 CurrentAmmoInMag = EquippedWeapon->GetCurrentAmmoInMag();
-    MaxAmmoOnHand = EquippedWeapon->GetMaxAmmoOnHand();
+    int32 CurrentAmmoOnHand = GetCurrentAmmoOnHand();
+    int32 CurrentAmmoInMag = GetCurrentAmmoInMag();
+    MaxAmmoOnHand = GetMaxAmmoOnHand();
 
     int32 MaxReloadAmount = MaxAmmoOnHand - CurrentAmmoOnHand;
     int32 AmmoToReload = FMath::Min(MaxReloadAmount, CurrentAmmoInMag);
@@ -507,31 +362,6 @@ int32 AWeapon::AmmoToReload()
     return AmmoToReload;
 }
 
-
-void AWeapon::PickUpAmmo(EWeaponType PickupType, int32 AmmoPickupAmount)
-{
-	UE_LOG(LogTemp, Warning, TEXT("PickUpAmmo function called"));
-	
-	/*
-		if Ammo to be added into magazine exceedes max ammo on hand load remaining into magazine
-		if remaining amount exceedes MagCapacity - CurrentAmmoInMag then discard
-		
-	*/
-
-    int32 CurrentAmmoOnHand = EquippedWeapon->GetCurrentAmmoOnHand();
-    int32 CurrentAmmoInMag = EquippedWeapon->GetCurrentAmmoInMag();
-    MaxAmmoOnHand = EquippedWeapon->GetMaxAmmoOnHand();
-    int32 MaxMagCapacity = EquippedWeapon->GetMagCapacity();
-
-    // Calculate the new ammo amount on hand
-    int32 NewAmmoOnHand = CurrentAmmoOnHand + AmmoPickupAmount;
-
-
-
-	// after value are set refresh HUD- change return type of AddAmmoPickUp - set new variable to accept
-	// return and then refresh HUD values
-
-}
 
 
 void AWeapon::RefreshHUD()
@@ -541,6 +371,7 @@ void AWeapon::RefreshHUD()
         AMyPlayerController* PlayerController = Cast<AMyPlayerController>(MainCharacter->GetController());
         if (PlayerController)
         {
+            UE_LOG(LogTemp, Warning, TEXT("PlayerController valid within RefreshHUD"));
             PlayerController->SetHUDAmmo(GetCurrentAmmoOnHand());
             PlayerController->SetHUDMagAmmo(GetCurrentAmmoInMag());
         }
@@ -605,51 +436,24 @@ void AWeapon::SetAmmoOnHand()
 void AWeapon::OnRep_Owner()
 {
 	Super::OnRep_Owner();
-	if(Owner == nullptr)
-	{
-		MainCharacter = nullptr;
-	}
-	else
-	{
-		SetHUDAmmo(GetCurrentAmmoOnHand());
-	}
-}
-
-void AWeapon::OnRep_EquippedWeapon()
-{
-
-}
-
-void AWeapon::OnRep_SecondaryWeapon()
-{
-	
+    if (GetOwner() == nullptr)
+    {
+        MainCharacter = nullptr;
+    }
+    else
+    {
+        MainCharacter = Cast<AMainCharacter>(GetOwner());
+        if (MainCharacter)
+        {
+            // Initialize any other necessary references
+            RefreshHUD();
+        }
+    }
 }
 
 
-void AWeapon::SetCombatState(ECombatState NewState)
-{
-	CombatState = NewState;
-	OnRep_CombatState();
 
-}
 
-void AWeapon::OnRep_CombatState()
-{
-	switch (CombatState)
-	{
-		case ECombatState::ECS_Reloading:
-			Reload();
-			break;
-		
-		case ECombatState::ECS_Unoccupied:
-			if(bFireButtonPressed)
-			{
-				bool bFire = true;
-				FireButtonPressed(bFire);
-			}
-			break;
-	}
-}
 
 void AWeapon::SetWeaponState(EWeaponState State)
 {
@@ -678,6 +482,7 @@ void AWeapon::OnRep_WeaponState()
 			WeaponMesh->SetSimulatePhysics(false);
 			WeaponMesh->SetEnableGravity(false);
 			WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+            break;
 
 		case EWeaponState::EWS_Dropped:
 			AreaSphere->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
@@ -695,104 +500,3 @@ void AWeapon::OnRep_WeaponState()
 
 	}
 }
-
-
-FVector AWeapon::CrossHairTrace(FHitResult& TraceHitResult)
-{
-	FVector2D ViewportSize;
-
-    if (GEngine && GEngine->GameViewport)
-    {
-        GEngine->GameViewport->GetViewportSize(ViewportSize);
-        // UE_LOG(LogTemp, Warning, TEXT("Viewport Size: %s"), *ViewportSize.ToString());
-    }
-
-    FVector2D CrosshairLocation(ViewportSize.X / 2.f, ViewportSize.Y / 2.f);
-    FVector CrosshairWorldPosition;
-    FVector CrosshairWorldDirection;
-
-    bool bScreenToWorld = UGameplayStatics::DeprojectScreenToWorld(
-        UGameplayStatics::GetPlayerController(this, 0), CrosshairLocation, CrosshairWorldPosition,
-        CrosshairWorldDirection
-    );
-
-    // UE_LOG(LogTemp, Warning, TEXT("Crosshair Location: %s"), *CrosshairLocation.ToString());
-    // UE_LOG(LogTemp, Warning, TEXT("Crosshair World Position: %s"), *CrosshairWorldPosition.ToString());
-    // UE_LOG(LogTemp, Warning, TEXT("Crosshair World Direction: %s"), *CrosshairWorldDirection.ToString());
-
-    if (bScreenToWorld)
-    {
-        FVector Start = CrosshairWorldPosition;
-        FVector End = Start + CrosshairWorldDirection * Trace_Length;
-        bool bHit = GetWorld()->LineTraceSingleByChannel(TraceHitResult, Start, End, ECollisionChannel::ECC_Visibility);
-
-        if (bHit && TraceHitResult.bBlockingHit)
-        {
-            LocalHitTarget = TraceHitResult.ImpactPoint;
-            // UE_LOG(LogTemp, Warning, TEXT("Line Trace Hit at: %s"), *TraceHitResult.ImpactPoint.ToString());
-            return TraceHitResult.ImpactPoint;
-        }
-        else
-        {
-            // UE_LOG(LogTemp, Warning, TEXT("Line Trace did not hit"));
-            return End;
-        }
-    }
-
-    UE_LOG(LogTemp, Warning, TEXT("Screen to World conversion failed"));
-    return FVector::ZeroVector;
-}
-
-void AWeapon::SetHUDCrosshairs(float Deltatime)
-{
-    if (MainCharacter == nullptr) return;
-
-    AMyPlayerController* PlayerController = Cast<AMyPlayerController>(MainCharacter->GetController());
-    if (PlayerController == nullptr)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Failed to cast MainCharacter's controller to AMyPlayerController"));
-        return;
-    }
-
-    HUD = HUD == nullptr ? Cast<AMyHUD>(PlayerController->GetHUD()) : HUD;
-    if (HUD)
-    {
-        if (EquippedWeapon == nullptr)
-        {
-            // UE_LOG(LogTemp, Warning, TEXT("Equipped Weapon not valid in set HUD"));
-            return;
-        }
-
-        HUDPackage.CrosshairsCenter = EquippedWeapon->CrosshairsCenter;
-        HUDPackage.CrosshairsLeft = EquippedWeapon->CrosshairsLeft;
-        HUDPackage.CrosshairsRight = EquippedWeapon->CrosshairsRight;
-        HUDPackage.CrosshairsBottom = EquippedWeapon->CrosshairsBottom;
-        HUDPackage.CrosshairsTop = EquippedWeapon->CrosshairsTop;
-
-        FVector2D SpeedRange(0.f, MainCharacter->GetCharacterMovement()->MaxWalkSpeed);
-        FVector2D VelocityRange(0.f , 1.f);
-        FVector Velocity = MainCharacter->GetVelocity();
-        Velocity.Z = 0.f;
-
-        CrosshairVelocityFactor = FMath::GetMappedRangeValueClamped(SpeedRange, VelocityRange, Velocity.Size());
-
-        HUDPackage.CrosshairSpread = 0.5f + CrosshairVelocityFactor;
-
-        HUD->SetHUDPackage(HUDPackage);
-    }
-}
-
-
-/*
- 
-
-Declare function EquipButton Pressed in MainCharacter that will call Equip Weapon function
-Declare Equip Weapon function in Combat Functionality
-Call Equip Weapon in MainCharacter.cpp and pass in variable that is holding overlapping weapon
-Declare function in MainCharacter.cpp that sets the variable that will hold the overlapping weapon
-This function will take pointer to Weapon function 
-Set overlapping weapon variable to this pointer
-This pointer can access overlapping function in Weapon class
-
-*/
-

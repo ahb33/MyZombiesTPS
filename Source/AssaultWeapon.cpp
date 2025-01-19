@@ -6,73 +6,92 @@
 #include "Engine/World.h" 
 #include "Engine/SkeletalMeshSocket.h" 
 #include "Kismet/GameplayStatics.h"
+#include "Net/UnrealNetwork.h"
 #include "Perception/AISense_Hearing.h"
 #include "EnemyCharacter.h"
 
+
+
 void AAssaultWeapon::Fire(const FVector& HitTarget)
 {
-    Super::Fire(HitTarget); // Call the base class version of Fire
+    // Call the base class Fire method for shared behavior
+    Super::Fire(HitTarget);
 
-    APawn* InstigatorPawn = Cast<APawn>(GetOwner()); // Cast the owner to a pawn
+    // weaponmesh is not valid or unable to get owner return
+    if (WeaponIsEmpty() || !GetWeaponMesh() || !GetOwner()) return;
 
-    const USkeletalMeshSocket* MuzzleFlashSocket = GetWeaponMesh()->GetSocketByName(FName("MuzzleFlash"));
+    // obtain muzzleflash socket created on weapon and store it in pointer to SKM variable called MuzzleSocket
+    const USkeletalMeshSocket* MuzzleSocket = GetWeaponMesh()->GetSocketByName(FName("MuzzleFlash"));
 
-    if (MuzzleFlashSocket && !WeaponIsEmpty())
-    {
-        // UE_LOG(LogTemp, Warning, TEXT("MuzzleFlashSocket is valid and weapon is not empty"));
-        SocketTransform = MuzzleFlashSocket->GetSocketTransform(GetWeaponMesh());
-        FVector MuzzleLocation = SocketTransform.GetLocation();
+    // if MuzzleSocket not valid return
+    if (!MuzzleSocket) return;
 
-        FHitResult CameraHit;
-        FVector AdjustedHitTarget = CrossHairTrace(CameraHit);
+    // 
+    FVector MuzzleLocation = MuzzleSocket->GetSocketTransform(GetWeaponMesh()).GetLocation();
 
-        FVector Direction = ((AdjustedHitTarget - MuzzleLocation) * 0.5f + (HitTarget - MuzzleLocation) * 0.5f).GetSafeNormal();        
-        FVector End = MuzzleLocation + Direction * Trace_Length;
+    // Determine initial fire direction
+    FVector FireDirection = (HitTarget - MuzzleLocation).GetSafeNormal();
 
-        FHitResult FireHit;
-        WeaponTraceHit(MuzzleLocation, End, FireHit);
-
-        if (ImpactParticles)
-        {
-            UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactParticles, FireHit.ImpactPoint, FireHit.ImpactNormal.Rotation());
-        }
-
-        UAISense_Hearing::ReportNoiseEvent(this, MuzzleLocation, 1.0f, InstigatorPawn, 2000.0f, TEXT("WeaponFire"));
-        // UE_LOG(LogTemp, Warning, TEXT("Noise event reported at location %s"), *MuzzleLocation.ToString());
-        
-        DrawDebugLine(GetWorld(), MuzzleLocation, End, FColor::Red, false, 1.0f, 0, 1.0f);
-        DrawDebugPoint(GetWorld(), FireHit.ImpactPoint, 10, FColor::Green, false, 1.0f);
-
-        // UE_LOG(LogTemp, Warning, TEXT("Firing weapon at %s"), *AdjustedHitTarget.ToString());
-    }
-    else
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Failed to fire weapon: MuzzleFlashSocket invalid or weapon is empty"));
-    }
-
-
-
-}
-
-void AAssaultWeapon::WeaponTraceHit(const FVector& TraceStart, const FVector& TraceEnd, FHitResult& FireHit)
-{
+    // Spawn projectile
     UWorld* World = GetWorld();
-    if (World)
+    if (World && Projectile)
     {
-        World->LineTraceSingleByChannel(FireHit, TraceStart, TraceEnd, ECollisionChannel::ECC_Visibility);
+        FActorSpawnParameters SpawnParams;
+        SpawnParams.Owner = GetOwner();
+        SpawnParams.Instigator = Cast<APawn>(GetOwner());
 
-        if (FireHit.bBlockingHit)
+        AProjectile* SpawnedProjectile = World->SpawnActor<AProjectile>(
+            Projectile, 
+            MuzzleLocation, 
+            FireDirection.Rotation(), 
+            SpawnParams
+        );
+
+        if (SpawnedProjectile)
         {
-            AEnemyCharacter* HitEnemy = Cast<AEnemyCharacter>(FireHit.GetActor());
-            if (HitEnemy)
-            {
-                HitEnemy->EnemyDamage(GetDamage());
-            }
+            // // Set the projectile's initial speed or other properties
+            // SpawnedProjectile->GetProjectileMovementComponent()->Velocity = FireDirection * SpawnedProjectile->GetProjectileSpeed();
         }
-
-        DrawDebugPoint(GetWorld(), FireHit.ImpactPoint, 10, FColor::Green, false, 1.0f);
     }
+
+    // Spawn muzzle flash
+    if (MuzzleFlash)
+    {
+        UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), MuzzleFlash, MuzzleLocation);
+    }
+
 }
+
+void AAssaultWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+    DOREPLIFETIME_CONDITION(AAssaultWeapon, AssaultWeaponAmmoOnHand, COND_OwnerOnly);
+    DOREPLIFETIME_CONDITION(AAssaultWeapon, AssaultWeaponAmmoInMag, COND_OwnerOnly);
+    DOREPLIFETIME(AAssaultWeapon, AssaultWeaponMaxAmmoOnHand);
+    DOREPLIFETIME(AAssaultWeapon, AssaultWeaponMagCapacity);
+}
+
+// void AAssaultWeapon::HandleFire(const FVector& HitTarget, const FVector& MuzzleLocation)
+// {
+//     Super::HandleFire(HitTarget, MuzzleLocation);
+    
+//     FVector FireDirection = (HitTarget - MuzzleLocation).GetSafeNormal();
+
+//     if (Projectile)
+//     {
+//         FActorSpawnParameters SpawnParams;
+//         SpawnParams.Owner = GetOwner();
+//         SpawnParams.Instigator = Cast<APawn>(GetOwner());
+
+//         GetWorld()->SpawnActor<AProjectile>(
+//             Projectile,
+//             MuzzleLocation,
+//             FireDirection.Rotation(),
+//             SpawnParams
+//         );
+//     }
+// }
 
 void AAssaultWeapon::SetAmmo(int32 NewAmmoOnHand, int32 NewAmmoInMag)
 {
@@ -115,11 +134,19 @@ void AAssaultWeapon::ReloadAmmo(int32 AmmoAmount)
 
 }
 
-
-
-
 float AAssaultWeapon::GetDamage() const
 {
     return 40.f;
 }
+
+void AAssaultWeapon::OnRep_AssaultWeaponAmmoOnHand()
+{
+    RefreshHUD();
+}
+
+void AAssaultWeapon::OnRep_AssaultWeaponAmmoInMag()
+{
+    RefreshHUD();
+}
+
 

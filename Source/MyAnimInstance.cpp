@@ -12,23 +12,20 @@ void UMyAnimInstance::NativeInitializeAnimation()
 {
     Super::NativeInitializeAnimation();
 
-    // Cache Pawn and MainCharacter safely
     Pawn = TryGetPawnOwner();
     if (Pawn)
     {
         MainCharacter = Cast<AMainCharacter>(Pawn);
         if (MainCharacter)
         {
-            EquippedWeapon = MainCharacter->GetEquippedWeapon();
+            playerWeapon = MainCharacter->GetEquippedWeapon();
         }
     }
 }
-
 void UMyAnimInstance::NativeUpdateAnimation(float DeltaTime)
 {
     Super::NativeUpdateAnimation(DeltaTime);
 
-    // Cache MainCharacter if it's not already cached
     if (!MainCharacter)
     {
         Pawn = TryGetPawnOwner();
@@ -36,10 +33,11 @@ void UMyAnimInstance::NativeUpdateAnimation(float DeltaTime)
         {
             MainCharacter = Cast<AMainCharacter>(Pawn);
         }
-
-        // If MainCharacter is still null after this point, exit early
         if (!MainCharacter) return;
     }
+
+    // Get the equipped weapon
+    playerWeapon = MainCharacter->GetEquippedWeapon();
     
     // Continue updates if MainCharacter is valid
     UpdateMovementProperties();
@@ -61,7 +59,7 @@ void UMyAnimInstance::UpdateMovementProperties()
 void UMyAnimInstance::UpdateCharacterProperties(float DeltaTime)
 {
     bWeaponEquipped = MainCharacter->IsWeaponEquipped();
-    EquippedWeapon = MainCharacter->GetEquippedWeapon();
+    playerWeapon = MainCharacter->GetEquippedWeapon();
     bIsCrouched = MainCharacter->bIsCrouched;
     bAiming = MainCharacter->IsAiming();
     TurningInPlace = MainCharacter->GetTurningInPlace();
@@ -85,9 +83,9 @@ void UMyAnimInstance::UpdateCharacterProperties(float DeltaTime)
 
 void UMyAnimInstance::UpdateWeaponProperties()
 {
-    if (bWeaponEquipped && EquippedWeapon && EquippedWeapon->GetWeaponMesh() && MainCharacter->GetMesh())
+    if (bWeaponEquipped && playerWeapon && playerWeapon->GetWeaponMesh() && MainCharacter->GetMesh())
     {
-        LeftHandTransform = EquippedWeapon->GetWeaponMesh()->GetSocketTransform(FName("LeftHandSocket"), ERelativeTransformSpace::RTS_World);
+        LeftHandTransform = playerWeapon->GetWeaponMesh()->GetSocketTransform(FName("LeftHandSocket"), ERelativeTransformSpace::RTS_World);
         
         FVector OutPosition;
         FRotator OutRotation;
@@ -98,10 +96,10 @@ void UMyAnimInstance::UpdateWeaponProperties()
         if (MainCharacter->IsLocallyControlled())
         {
             bLocallyControlled = true;
-            FTransform RightHandTransform = EquippedWeapon->GetWeaponMesh()->GetSocketTransform(FName("hand_r"), ERelativeTransformSpace::RTS_World);
+            FTransform RightHandTransform = playerWeapon->GetWeaponMesh()->GetSocketTransform(FName("hand_r"), ERelativeTransformSpace::RTS_World);
             FRotator LookAtRotation = UKismetMathLibrary::FindLookAtRotation(RightHandTransform.GetLocation(), RightHandTransform.GetLocation() + (RightHandTransform.GetLocation() - MainCharacter->GetHitTarget()));
 
-            bUseFABRIK = EquippedWeapon->GetCombatState() != ECombatState::ECS_Reloading;
+            bUseFABRIK = MainCharacter->GetCharacterCombatState() != ECombatState::ECS_Reloading;
 
             if (bIsPlayerReloading)
             {

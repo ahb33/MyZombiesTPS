@@ -14,6 +14,23 @@ AZombiesGameMode::AZombiesGameMode()
 
 void AZombiesGameMode::BeginPlay()
 {
+    
+
+    // Ensure the PlayerController possesses the correct pawn
+    APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
+    if (PlayerController && !PlayerController->GetPawn())
+    {
+        APawn* SpawnedPawn = GetWorld()->SpawnActor<APawn>(DefaultPawnClass, FVector::ZeroVector, FRotator::ZeroRotator);
+        if (SpawnedPawn)
+        {
+            PlayerController->Possess(SpawnedPawn);
+            UE_LOG(LogTemp, Warning, TEXT("MainCharacter possessed in ZombiesGameMode."));
+        }
+        else
+        {
+            UE_LOG(LogTemp, Error, TEXT("Failed to spawn or possess pawn in ZombiesGameMode."));
+        }
+    }
     Super::BeginPlay();
     ApplyLevelModifiers();
     StartNextWave();
@@ -89,16 +106,25 @@ void AZombiesGameMode::StartNextWave()
     // Reset RemainingEnemies for the current wave
     RemainingEnemies = NumberOfZombiesForCurrentLevel;
 
-    // Use the first spawner to handle all zombie initialization and spawning
-    if (AAI_EnemySpawner* EnemySpawner = Cast<AAI_EnemySpawner>(Spawners[0]))
+    // Distribute zombies across random spawners
+    int32 ZombiesToSpawn = NumberOfZombiesForCurrentLevel;
+
+    while (ZombiesToSpawn > 0)
     {
-        // Initialize the zombie array and spawn the required number of zombies
-        EnemySpawner->InitZombieArray(NumberOfZombiesForCurrentLevel);
-        EnemySpawner->SpawnZombies(NumberOfZombiesForCurrentLevel);
-    }
-    else
-    {
-        UE_LOG(LogTemp, Error, TEXT("Failed to cast the first spawner!"));
+        // Pick a random spawner
+        int32 RandomIndex = FMath::RandRange(0, Spawners.Num() - 1);
+        if (AAI_EnemySpawner* EnemySpawner = Cast<AAI_EnemySpawner>(Spawners[RandomIndex]))
+        {
+            // Calculate zombies for this spawner
+            int32 SpawnCount = FMath::Min(FMath::RandRange(1, ZombiesToSpawn), ZombiesToSpawn);
+
+            // Initialize and spawn zombies
+            EnemySpawner->InitZombieArray(SpawnCount);
+            EnemySpawner->SpawnZombies(SpawnCount);
+
+            // Deduct from remaining zombies
+            ZombiesToSpawn -= SpawnCount;
+        }
     }
 
     // Bind events for the newly spawned zombies
@@ -108,10 +134,11 @@ void AZombiesGameMode::StartNextWave()
 }
 void AZombiesGameMode::BindZombieDeathEvents()
 {
+    UE_LOG(LogTemp, Warning, TEXT("BindZombieDeathEvents called"));
     TArray<AActor*> Zombies;
     UGameplayStatics::GetAllActorsOfClass(GetWorld(), AEnemyCharacter::StaticClass(), Zombies);
 
-    for (AActor* ZombieActor : Zombies)
+    for (AActor* ZombieActor : Zombies) // for each iteration of Zombies clear then bind the OnZombieKilled function to delegate
     {
         if (AEnemyCharacter* Zombie = Cast<AEnemyCharacter>(ZombieActor))
         {

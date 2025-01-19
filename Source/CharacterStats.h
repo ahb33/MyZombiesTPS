@@ -31,4 +31,6 @@ public:
 	UPROPERTY(meta = (BindWidget))
 	UTextBlock* AmmoInMag;
 
+	// add scores and kill count here for death match
+
 };

@@ -12,7 +12,7 @@ void AAmmoPickUp::OnSphereBeginOverlap(UPrimitiveComponent* OverlappedComponent,
     Create pointer to Weapon class
     Construct variable that is pointer to MainCharacter and cast OtherActor from Sphere begin overlap
     Check if MainCharacter is valid
-    Construct myWeapon variable that is pointer to Weapon class and call GetEquippedWeapon within MainCharacter
+    Construct myWeapon variable that is pointer to Weapon class and call GetPrimaryWeapon within MainCharacter
     Check if myWeapon is valid
 
     */
@@ -20,12 +20,12 @@ void AAmmoPickUp::OnSphereBeginOverlap(UPrimitiveComponent* OverlappedComponent,
     MainCharacter = Cast<AMainCharacter>(OtherActor);
     if(MainCharacter)
     {
-        myWeapon = MainCharacter->GetEquippedWeapon();
-        if (myWeapon)
-        {
+        // myWeapon = MainCharacter->GetEquippedWeapon();
+        // if (myWeapon)
+        // {
             
-            // myWeapon->PickUpAmmo(WeaponType, AmmoAmount);
-        }
+        //     // myWeapon->PickUpAmmo(WeaponType, AmmoAmount);
+        // }
 
     }
 

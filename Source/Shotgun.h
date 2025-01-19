@@ -19,12 +19,12 @@ class MYZOMBIES_API AShotgun : public AWeapon
 	GENERATED_BODY()
 	
 public:
-	virtual void Fire(const FVector& HitTarget) override;	
 
+
+    virtual void Fire(const FVector& Hit); // Virtual for child class overrides.
 
 	// modify WaponTrace function from Assault Weapon to include scatter 
 	void WeaponTraceWithScatter(const FVector& TraceStart, const FVector& HitTarget, FHitResult& FireHit);
-
 
 	virtual void SetAmmo(int32 NewAmmoOnHand, int32 NewAmmoInMag) override;
 
@@ -38,35 +38,35 @@ public:
 
 	virtual void ReloadAmmo(int32 Ammo) override;
 
-
 	virtual float GetDamage() const override;
+
+	FVector CalculateScatterEndPoint(const FVector& MuzzleLocation, const FVector& HitTarget);
+
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION()
+    void OnRep_ShotgunAmmoOnHand();
+
+    UFUNCTION()
+    void OnRep_ShotgunAmmoInMag();
 
 
 private:
-	UPROPERTY(EditAnywhere)
-	TSubclassOf<class AProjectile> Projectile; /*we can populate this variable with projectile or anything derived of  projectile*/
 
-	class AMainCharacter* PlayerCharacter;
-	
-	UPROPERTY(EditAnywhere)
-	float Damage;
+    UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_ShotgunAmmoOnHand)
+    int32 ShotgunAmmoOnHand;
 
-	UPROPERTY(EditAnywhere)
-	class UParticleSystem* ImpactParticles; // particles will be spawned if we get blocking hit
+    UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_ShotgunAmmoInMag)
+    int32 ShotgunAmmoInMag;
 
-	UPROPERTY(EditAnywhere)
-	int32 ShotgunAmmoOnHand; // 
+    UPROPERTY(EditAnywhere, Replicated)
+    int32 ShotgunMaxAmmoOnHand;
 
-	UPROPERTY(EditAnywhere)
-	int32 ShotgunAmmoInMag; // 
-
-	UPROPERTY(EditAnywhere)
-	int32 ShotgunMaxAmmoOnHand; // 
-
-	UPROPERTY(EditAnywhere)
-	int32 ShotgunMagCapacity; // 
+    UPROPERTY(EditAnywhere, Replicated)
+    int32 ShotgunMagCapacity;
 
 	FTransform SocketTransform;
+
 
 
 };

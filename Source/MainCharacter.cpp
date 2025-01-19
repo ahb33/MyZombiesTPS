@@ -10,89 +10,79 @@
 #include "EngineUtils.h"
 #include "Weapon.h"
 #include "MyHUD.h"
+#include "HealthPickUp.h"
+#include "combatComponent.h"
+#include "AmmoPickUp.h"
+#include "MyPlayerController.h"
 #include "Animation/AnimInstance.h" 
 #include "WeaponTypes.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Weapon.h"
 
-// Sets default values
+// redo initializer list
 AMainCharacter::AMainCharacter()
+    : CameraBoom(CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"))),
+      FollowCamera(CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"))),
+      OverlappingWeapon(nullptr),
+      PlayerHealth(100.f),
+      FireMontage(nullptr),
+      ReloadMontage(nullptr),
+      MaxHealth(100.f),
+      AO_Yaw(0.f),
+      AO_Pitch(0.f),
+      InterpAO_Yaw(0.f),
+      TurningInPlace(ETurningInPlace::ETIP_NotTurning),
+      OverlappingItem(nullptr),
+      pickUpHealth(nullptr),
+      MyPlayerController(nullptr),
+      MyGameHUD(nullptr)
 {
- 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
-	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
-	CameraBoom->SetupAttachment(GetMesh()); /* attach to mesh not root component
-	                                     	since we will be running and crouching */
-	CameraBoom->TargetArmLength = 400.f;
-	CameraBoom->bUsePawnControlRotation = true; // set to true to be able rotate camera around player
-	// now that we've created cameraboom we can create camera
+    PrimaryActorTick.bCanEverTick = true;
 
-	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
-	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName); /* This will attach
-	camera to camera boom */
+    // Attach the camera boom to the mesh to allow it to follow the character's movements (e.g., crouching)
+    CameraBoom->SetupAttachment(GetMesh());
+    CameraBoom->TargetArmLength = 400.f;
+    CameraBoom->bUsePawnControlRotation = true; // Rotate the arm based on the controller
 
-	myWeapon = CreateDefaultSubobject<AWeapon>(TEXT("Weapon")); /* this variable
-	will handle all combat related functionality for our character */
+    // Attach the follow camera to the camera boom
+    FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+    FollowCamera->bUsePawnControlRotation = false; // Camera does not rotate relative to arm
 
-	// pickUpHealth = CreateDefaultSubobject<AHealthPickUp>(TEXT("HealthBar")); /* this variable
-	// will handle all health related functionality for our character */
-	// Weapon->SetIsReplicated(true); // 
+    // Character movement settings
+    bUseControllerRotationYaw = false; // Let the character movement handle rotation
+    GetCharacterMovement()->bOrientRotationToMovement = true; // Character moves in the direction of input
+    GetCharacterMovement()->NavAgentProps.bCanCrouch = true; // Enable crouching
 
+    combatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("ComponentComponent"));
 
-	bUseControllerRotationYaw = true;
-	GetCharacterMovement()->bOrientRotationToMovement = true;
-
-	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
-	TurningInPlace = ETurningInPlace::ETIP_NotTurning;
-
-} 
-
+}
 
 // Called when the game starts or when spawned
 void AMainCharacter::BeginPlay()
 {
-	Super::BeginPlay();
+    Super::BeginPlay();
 
-    // Validate and cast the player controller
-    MyPlayerController = Cast<AMyPlayerController>(Controller);
-    if (MyPlayerController)
+    // Initialize Player Controller
+    MyPlayerController = Cast<AMyPlayerController>(GetController());
+    if (!MyPlayerController)
     {
-        UE_LOG(LogTemp, Warning, TEXT("Main character's player controller is valid"));
-        MyPlayerController->SetHUDHealth(PlayerHealth, MAXHealth);
+        UE_LOG(LogTemp, Warning, TEXT("Failed to initialize MyPlayerController"));
     }
     else
     {
-        UE_LOG(LogTemp, Error, TEXT("Main character's player controller is null"));
+        MyPlayerController->SetHUDHealth(PlayerHealth, MaxHealth);
     }
 
-	
-    // Validate and cast the HUD
-    if (APlayerController* PlayerController = GetWorld()->GetFirstPlayerController())
+    // Initialize HUD
+    MyGameHUD = Cast<AMyHUD>(GetWorld()->GetFirstPlayerController()->GetHUD());
+    if (!MyGameHUD)
     {
-        if (AHUD* HUD = PlayerController->GetHUD())
-        {
-            MyGameHUD = Cast<AMyHUD>(HUD);
-            if (MyGameHUD)
-            {
-                MyGameHUD->AddCharacterStats();
-            }
-            else
-            {
-                UE_LOG(LogTemp, Error, TEXT("MyGameHUD is null"));
-            }
-        }
-        else
-        {
-            UE_LOG(LogTemp, Error, TEXT("HUD is null"));
-        }
+        UE_LOG(LogTemp, Warning, TEXT("Failed to initialize MyGameHUD"));
     }
     else
     {
-        UE_LOG(LogTemp, Error, TEXT("PlayerController is null"));
+        MyGameHUD->AddCharacterStats();
     }
-
-
-	// pickUpHealth = Cast<AHealthPickUp>(UGameplayStatics::GetActorOfClass(this, AHealthPickUp::StaticClass()));
 
 }
 
@@ -131,13 +121,11 @@ void AMainCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME_CONDITION(AMainCharacter, OverlappingWeapon, COND_OwnerOnly);
-	DOREPLIFETIME(AMainCharacter, PlayerHealth);
-	DOREPLIFETIME(AMainCharacter, MAXHealth);
+
+    DOREPLIFETIME_CONDITION(AMainCharacter, OverlappingWeapon, COND_OwnerOnly);
 
 
-
-
+    DOREPLIFETIME(AMainCharacter, PlayerHealth);
 }
 
 // Called every frame
@@ -145,39 +133,58 @@ void AMainCharacter::Tick(float DeltaTime)
 {				
 	Super::Tick(DeltaTime);
 	AimOffset(DeltaTime);
+    InitValues();
 				 
+}
+
+// hud 
+void AMainCharacter::InitValues()
+{
+    if (!MyPlayerController)
+    {
+        MyPlayerController = Cast<AMyPlayerController>(Controller);
+        if (MyPlayerController)
+        {
+            MyGameHUD = Cast<AMyHUD>(MyPlayerController->GetHUD());
+            if (MyGameHUD)
+            {
+                UE_LOG(LogTemp, Warning, TEXT("MyGameHUD is valid"));
+                MyGameHUD->AddCharacterStats();
+            }
+        }
+    }
+
 }
 
 void AMainCharacter::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
-	if(myWeapon)
+
+	if (combatComponent)
 	{
-		myWeapon->MainCharacter = this;
+		combatComponent->MainCharacter = this;
 	}
 }
 
+// Movement Functions
 void AMainCharacter::MoveForward(float value)
 {
-	if(Controller != nullptr && value != 0.f)
-	{	
-		// we will change controller rotation which may 
-		// have different rotation from root component. 
-		// We want to move forward in controllers forward direction not character forward direction
-		const FRotator YawRotation(0.f, Controller->GetControlRotation().Yaw, 0.f); // we will use this FRotator to get forward vector
-
-		const FVector Direction( FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X));
-
-		AddMovementInput(Direction, value);
-	}
+    if (Controller != nullptr && value != 0.f)
+    {
+        const FRotator yawRotation(0.f, Controller->GetControlRotation().Yaw, 0.f);
+        const FVector direction = FRotationMatrix(yawRotation).GetUnitAxis(EAxis::X);
+        AddMovementInput(direction, value);
+    }
 }
 
 void AMainCharacter::MoveRight(float value)
 {
-		const FRotator YawRotation(0.f, Controller->GetControlRotation().Yaw, 0.f); // we will use this FRotator to get forward vector
-
-		const FVector Direction( FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y));		
-		AddMovementInput(Direction, value);
+    if (Controller != nullptr && value != 0.f)
+    {
+        const FRotator yawRotation(0.f, Controller->GetControlRotation().Yaw, 0.f);
+        const FVector direction = FRotationMatrix(yawRotation).GetUnitAxis(EAxis::Y);
+        AddMovementInput(direction, value);
+    }
 }
 
 void AMainCharacter::Turn(float value)
@@ -190,39 +197,83 @@ void AMainCharacter::LookUp(float value)
 	AddControllerPitchInput(value);
 }	
 
+void AMainCharacter::EquipButtonPressed()
+{
+    if(combatComponent)
+    {
+        if(OverlappingWeapon)
+        {
+            if(HasAuthority())
+            {
+                ServerEquipButtonPressed();
+            }
+        }
+        else if(!OverlappingWeapon && combatComponent->ShouldSwapWeapons())// else if no overlapping weapon is valid but equipp
+        {
+            // check where combat component is even being set
+            combatComponent->SwapWeapons();
+        }
+    }
+}
+
+void AMainCharacter::ServerEquipButtonPressed_Implementation()
+{
+    // Directly call the equip logic for the server
+    if (combatComponent)
+    {
+        if(OverlappingWeapon)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Overlapping weapon is valid"));
+            combatComponent->EquipWeapon(OverlappingWeapon);
+
+        }
+
+        else if(combatComponent->ShouldSwapWeapons())
+        {
+            combatComponent->SwapWeapons();
+        }
+
+        UE_LOG(LogTemp, Warning, TEXT("ServerEquip function called"));
+    }
+}
+
 void AMainCharacter::SetOverlappingWeapon(AWeapon* Weapon)
 {
-	// if you overlap another weapon and myWeapon is valid, i.e weapon is already equipped then dont
-	// set myWeapon just yet
-	if(OverlappingWeapon) // OverlappingWeapon is pointer to AWeapon declared in header file
+    // Prevent overlapping with the currently equipped weapon
+    if (OverlappingWeapon)
+    {
+        OverlappingWeapon->ShowPickUpWidget(false);
+    }
+
+    OverlappingWeapon = Weapon;
+
+    if (IsLocallyControlled() && OverlappingWeapon)
+    {
+        OverlappingWeapon->ShowPickUpWidget(true);
+    }
+}
+
+void AMainCharacter::OnRep_OverlappingWeapon()
+{
+    if (OverlappingWeapon)
+    {
+        OverlappingWeapon->ShowPickUpWidget(true);
+    }
+	else
 	{
 		OverlappingWeapon->ShowPickUpWidget(false);
 	}
-
-	OverlappingWeapon = Weapon; // assigning the value of pointer passed into function to OverlappingWeapon
-
-	if (IsLocallyControlled())
-	{
-		if(OverlappingWeapon)
-		{
-			OverlappingWeapon->ShowPickUpWidget(true);
-		}
-	}
-
 }
 
-void AMainCharacter::OnRep_OverlappingWeapon(AWeapon* LastWeapon)
+bool AMainCharacter::IsWeaponEquipped() const
 {
-	if(OverlappingWeapon)
-	{
-		OverlappingWeapon->ShowPickUpWidget(true);
-	}
-	if (LastWeapon)
-	{
-		LastWeapon->ShowPickUpWidget(false);
-	}
+    return combatComponent && combatComponent->GetEquippedWeapon() != nullptr;
 }
 
+AWeapon* AMainCharacter::GetEquippedWeapon()
+{
+    return combatComponent ? combatComponent->GetEquippedWeapon() : nullptr;
+}
 
 void AMainCharacter::SetOverlappingItem(APickUp* PickUp)
 {
@@ -245,33 +296,6 @@ void AMainCharacter::SetOverlappingItem(APickUp* PickUp)
 
 }
 
-bool AMainCharacter::IsWeaponEquipped()
-{
-	return (myWeapon && myWeapon->EquippedWeapon);
-}
-
-
-void AMainCharacter::ServerEquipButtonPressed_Implementation()
-{
-    
-}
-void AMainCharacter::EquipButtonPressed()
-{
-	
-	if(OverlappingWeapon)
-	{
-		if(myWeapon && HasAuthority())
-		{
-			myWeapon->EquipWeapon(OverlappingWeapon);
-		}
-
-	}
-
-	else if (myWeapon->ShouldSwapWeapons())
-	{
-		myWeapon->SwapWeapons();
-	}
-}
 
 
 void AMainCharacter::PickUpButtonPressed()
@@ -279,9 +303,8 @@ void AMainCharacter::PickUpButtonPressed()
 	if (pickUpHealth && IsValid(pickUpHealth))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Calling AddHealth on pickUpHealth"));
-		pickUpHealth->AddHealth(PlayerHealth, MAXHealth);
-		// pickUpHealth->Destroy(); // Destroy the pickup after adding health
-		// pickUpHealth = nullptr; // Set the pickup reference to null
+		pickUpHealth->AddHealth(PlayerHealth, MaxHealth);
+		pickUpHealth = nullptr; // Set the pickup reference to null
 	}
 	else
 
@@ -291,146 +314,113 @@ void AMainCharacter::PickUpButtonPressed()
 
 }
 
-
+// re-engineer
 void AMainCharacter::FireButtonPressed()
 {
-	if(myWeapon)
+	if(combatComponent)
 	{
-		myWeapon->FireButtonPressed(true);
+		combatComponent->FireButtonPressed(true);
 	}
 
 }
 
+// re-engineer
 void AMainCharacter::FireButtonReleased()
 {
-	if(myWeapon)
+	if(combatComponent)
 	{
-		myWeapon->FireButtonPressed(false);
+		combatComponent->FireButtonPressed(false);
 	}
 }
 
 void AMainCharacter::ReloadButtonPressed()
 {
-	if(!myWeapon)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("No Weapon is equipped"));
-		return;
-	}
-
-	else 
-	{
-		UE_LOG(LogTemp, Warning, TEXT("myWeapon is valid"));
-		myWeapon->Reload();
-	}
 
 
 }
 
 void AMainCharacter::AimButtonPressed()
 {	
-	if(myWeapon)
-	{
-		myWeapon->SetAiming(true);
-	}	
+    if(combatComponent)
+    {
+        combatComponent->SetAiming(true);
+    }
+
 }
 
 
 void AMainCharacter::AimButtonReleased()
 {
-	if(myWeapon)
-	{
-		myWeapon->SetAiming(false);
-	}	
+    if(combatComponent)
+    {
+        combatComponent->SetAiming(false);
+    }
 }
 
-bool AMainCharacter::IsAiming()
+bool AMainCharacter::IsAiming() const
 {
-	return (myWeapon && myWeapon->bAiming);
+    return (combatComponent && combatComponent->bAiming);
 }
 
-bool AMainCharacter::IsReloading()
+bool AMainCharacter::IsReloading() const
 {
-	bool reloading = (myWeapon && myWeapon->bReloading);
-    UE_LOG(LogTemp, Warning, TEXT("IsReloading() called, bReloading = %s"), reloading ? TEXT("true") : TEXT("false"));
-    return reloading;
+
+    return false;
 
 }
 
 
 void AMainCharacter::PlayFireMontage(bool bAiming)
 {
-	if (myWeapon == nullptr || myWeapon->EquippedWeapon == nullptr) return;
-	
-	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
-	if(AnimInstance && FireMontage)
-	{
 
-		FName SectionName;
-		// SectionName = bAiming ? FName("FireIronSight") : FName("RifleHip");
-		if(bAiming)
-		{
-			SectionName = FName("FireIronSight");
-
-		}
-		else
-		{
-			SectionName = FName("RifleHip");			
-		}
-
-		AnimInstance->Montage_JumpToSection(SectionName);
-	}
+    UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+    if (AnimInstance && FireMontage)
+    {
+        FName SectionName = bAiming ? FName("FireIronSight") : FName("RifleHip");
+        AnimInstance->Montage_JumpToSection(SectionName);
+    }
 }
 
 void AMainCharacter::PlayReloadMontage()
 {
-	if (myWeapon == nullptr || myWeapon->EquippedWeapon == nullptr) return;
 	
 	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
 	if(AnimInstance && ReloadMontage)
-	{
-	
-		FName SectionName;
+	{	
 		UE_LOG(LogTemp, Warning, TEXT("AnimInstance And ReloadMontage correct") );
 		AnimInstance->Montage_Play(ReloadMontage);
+		FName SectionName;
 
-		switch (myWeapon->EquippedWeapon->GetWeaponType())
-		{
-			case EWeaponType::EWT_AssaultRifle:
-				SectionName = FName("HipReload");
-				break;
-			// case EWeaponType::EWT_Pistol:
-			// 	SectionName = FName("Pistol");
-			// 	break;
-			// case EWeaponType::EWT_Shotgun:
-			// 	SectionName = FName("Shotgun");
-			// 	break;
-			// Add more cases for other weapon types as needed
-			default:
-				// Handle unknown weapon types here
-				break;
-		}	
-		AnimInstance->Montage_JumpToSection(SectionName);
+        EWeaponType WeaponType = GetEquippedWeapon()->GetWeaponType();
+        switch (WeaponType)
+        {
+            case EWeaponType::EWT_AssaultRifle:
+                UE_LOG(LogTemp, Warning, TEXT("Assault Rifle enum called"));
+                SectionName = FName("Rifle");
+                break;
+            case EWeaponType::EWT_Shotgun:
+                SectionName = FName("Shotgun");
+                break;
+            // Add cases for other weapon types
+            default:
+                UE_LOG(LogTemp, Error, TEXT("Unknown Weapon Type: %d"), static_cast<int32>(WeaponType));
+                return; // Early exit to avoid calling with an invalid SectionName
+        }
+
+        AnimInstance->Montage_JumpToSection(SectionName);
 	}
 }
 
 
-float AMainCharacter::GetReloadDuration()
+float AMainCharacter::GetReloadDuration() const
 {
-    if (ReloadMontage)
+    if (this->ReloadMontage)
     {
-        // Return the duration of the reload montage
-        return ReloadMontage->GetPlayLength();
+        return this->ReloadMontage->GetPlayLength();
     }
     return 0.0f;
 }
 
-
-AWeapon *AMainCharacter::GetEquippedWeapon()
-{
-    if(myWeapon == nullptr) return nullptr; 
-	return myWeapon->GetWeapon();
-
-}
 
 void AMainCharacter::CrouchButtonPressed()
 {
@@ -444,46 +434,33 @@ void AMainCharacter::CrouchButtonPressed()
 	}
 }
 
+// Aim Offset Functions
 void AMainCharacter::AimOffset(float DeltaTime)
 {
-	// First check if you are equipping the weapon
-	if(myWeapon && myWeapon->EquippedWeapon == nullptr) return;
-	/*get vector for velocity using Unreal's GetVelocity function
-	get vector for lateral speed using the x and y of vector you just created
-	now you can create a float for the character's lateral speed by obtaining the size of the vector
-	you just created */ 
 
-	    FVector Velocity = GetVelocity();
-        FVector LateralSpeed = FVector(Velocity.X, Velocity.Y, 0.f); // movement in Z does not matter
-        float MovementSpeed = LateralSpeed.Size();
 
-		/*create variable to check if in air */
-		bool bIsInAir = GetCharacterMovement()->IsFalling();
+    FVector velocity = GetVelocity();
+    FVector lateralSpeed = FVector(velocity.X, velocity.Y, 0.f);
+    float movementSpeed = lateralSpeed.Size();
 
-		/*check if standing still and not falling*/
-		if (MovementSpeed == 0.f && !bIsInAir) // standing still, not jumping
-		{
-			/*Need to be able to calculate Delta Rotation
-			create variable for starting rotation and aiming rotation*/
+    bool bIsInAir = GetCharacterMovement()->IsFalling();
 
-			FRotator CurrentAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
-			FRotator DeltaAimRotation = UKismetMathLibrary::NormalizedDeltaRotator(CurrentAimRotation, StartingAimRotation);
-			AO_Yaw = DeltaAimRotation.Yaw;
-			bUseControllerRotationYaw = false;
-			TurnInPlace(DeltaTime);
-	
-		}
-
-		/*check if running or jumping*/
-		if(MovementSpeed > 0 || bIsInAir)
-		{
-			StartingAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
-			//We need to keep AO_Yaw 0 as we keep moving
-			AO_Yaw = 0.f;
-			bUseControllerRotationYaw = true;
-			TurningInPlace = ETurningInPlace::ETIP_NotTurning;
-		}
-		AO_Pitch = GetBaseAimRotation().Pitch;
+    if (movementSpeed == 0.f && !bIsInAir)
+    {
+        FRotator currentAimRotation(0.f, GetBaseAimRotation().Yaw, 0.f);
+        FRotator deltaAimRotation = UKismetMathLibrary::NormalizedDeltaRotator(currentAimRotation, StartingAimRotation);
+        AO_Yaw = deltaAimRotation.Yaw;
+        bUseControllerRotationYaw = false;
+        TurnInPlace(DeltaTime);
+    }
+    else
+    {
+        StartingAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
+        AO_Yaw = 0.f;
+        bUseControllerRotationYaw = true;
+        TurningInPlace = ETurningInPlace::ETIP_NotTurning;
+    }
+    AO_Pitch = GetBaseAimRotation().Pitch;
 }
 
 void AMainCharacter::TurnInPlace(float DeltaTime)
@@ -515,10 +492,18 @@ void AMainCharacter::OnRep_Health()
 
 }
 
+ECombatState AMainCharacter::GetCharacterCombatState() const
+{
+	// if (combatComponent == nullptr) 
+    return ECombatState::ECS_MAX;
+	// return combatComponent->GetcombatComponentState(); 
+}
+
 
 FVector AMainCharacter::GetHitTarget() const
 {
-	if(myWeapon == nullptr) return FVector();
-	return myWeapon->LocalHitTarget;
+	// if(combatComponent == nullptr)
+     return FVector();
+	// return combatComponent->GetLocalHitTarget();
 }
 
