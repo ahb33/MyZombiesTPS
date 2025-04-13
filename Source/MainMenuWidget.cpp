@@ -7,10 +7,11 @@
 void UMainMenuWidget::NativeConstruct()
 {
     Super::NativeConstruct();
+
     // Only create the widget instance if it's not already in the array
-
-
     MenuSetup();
+
+    
 }
 
 
@@ -54,16 +55,16 @@ void UMainMenuWidget::OnSoloClicked()
 void UMainMenuWidget::OnMultiplayerClicked()
 {
     // Ensure widget creation before attempting transition
-    FName MultiplayerMenu = "MultiplayerMenu";
+    FName GameModeSelectionMenu = "GameModeSelectionMenu";
 
-    auto multiplayerMenuWidgetRef = GetMultiplayerMenuWidgetClass();
+    auto gameModeSelectionMenuWidgetRef = GetGameModeSelectionMenuWidgetClass();
 
-    if (!menuWidgetMap.Contains(MultiplayerMenu))
+    if (!menuWidgetMap.Contains(GameModeSelectionMenu))
     {
-        Super::CreateAndStoreWidget(MultiplayerMenu, multiplayerMenuWidgetRef);
+        Super::CreateAndStoreWidget(GameModeSelectionMenu, gameModeSelectionMenuWidgetRef);
     }
 
-    TransitionToMenu(MultiplayerMenu);
+    TransitionToMenu(GameModeSelectionMenu);
 }
 
 

@@ -7,6 +7,8 @@
 
 void USoloMenuWidget::NativeConstruct()
 {
+    Super::NativeConstruct();
+
     MenuSetup();
 }
 
@@ -18,6 +20,8 @@ void USoloMenuWidget::MenuSetup()
 
 void USoloMenuWidget::BindButtonEvents()
 {
+    UE_LOG(LogTemp, Warning, TEXT("BindButtonEvents called"));
+    
     // Check if EasyButton is valid and not already bound and then bind it to OnEasyButtonClicked
     if (EasyButton && !EasyButton->OnClicked.IsAlreadyBound(this, &USoloMenuWidget::OnEasyButtonClicked))
     {
@@ -45,16 +49,17 @@ void USoloMenuWidget::BindButtonEvents()
 
 void USoloMenuWidget::OnEasyButtonClicked()
 {
-
-    // Transition to the Solo Level with specific GameMode
-    UGameplayStatics::OpenLevel(this, FName("SoloLevel"));  
-
+    // Open the solo map
+    UE_LOG(LogTemp, Warning, TEXT("Opening SpaceShipLevel..."));
+    UGameplayStatics::OpenLevel(this, FName("SpaceShipLevel_Solo"));
 }
 
 void USoloMenuWidget::OnMediumButtonClicked()
 {
 
+
 }
+
 
 void USoloMenuWidget::OnHardButtonClicked()
 {
@@ -64,7 +69,7 @@ void USoloMenuWidget::OnHardButtonClicked()
 void USoloMenuWidget::OnBackButtonClicked()
 {
 
-    UE_LOG(LogTemp, Warning, TEXT("MainMenuClicked"));
+    UE_LOG(LogTemp, Warning, TEXT("BackButtonClicked"));
     // Ensure widget creation before attempting transition
 
     FName MainMenu = "MainMenu";
@@ -73,7 +78,7 @@ void USoloMenuWidget::OnBackButtonClicked()
 
     if (!menuWidgetMap.Contains(MainMenu))
     {
-        UE_LOG(LogTemp, Log, TEXT("Creating MultiplayerMenu widget."));
+        UE_LOG(LogTemp, Log, TEXT("Creating MainMenu widget."));
         Super::CreateAndStoreWidget(MainMenu, mainMenuWidgetRef);
     }
 

@@ -11,87 +11,48 @@
 #include "EnemyCharacter.h"
 
 
-
 void AAssaultWeapon::Fire(const FVector& HitTarget)
 {
-    // Call the base class Fire method for shared behavior
     Super::Fire(HitTarget);
 
-    // weaponmesh is not valid or unable to get owner return
-    if (WeaponIsEmpty() || !GetWeaponMesh() || !GetOwner()) return;
+    APawn* InstigatorPawn = Cast<APawn>(GetOwner());
 
-    // obtain muzzleflash socket created on weapon and store it in pointer to SKM variable called MuzzleSocket
-    const USkeletalMeshSocket* MuzzleSocket = GetWeaponMesh()->GetSocketByName(FName("MuzzleFlash"));
-
-    // if MuzzleSocket not valid return
-    if (!MuzzleSocket) return;
-
-    // 
-    FVector MuzzleLocation = MuzzleSocket->GetSocketTransform(GetWeaponMesh()).GetLocation();
-
-    // Determine initial fire direction
-    FVector FireDirection = (HitTarget - MuzzleLocation).GetSafeNormal();
-
-    // Spawn projectile
+    const USkeletalMeshSocket* MuzzleFlashSocket = GetWeaponMesh()->GetSocketByName(FName("MuzzleFlash"));
     UWorld* World = GetWorld();
-    if (World && Projectile)
+
+    if (MuzzleFlashSocket && World)
     {
+        // Get the transform of the muzzle socket
+        SocketTransform = MuzzleFlashSocket->GetSocketTransform(GetWeaponMesh());
+
+        // Compute direction to target
+        FVector ToTarget = HitTarget - SocketTransform.GetLocation();
+        FRotator TargetRotation = ToTarget.Rotation();
+
+        // Setup spawn parameters
         FActorSpawnParameters SpawnParams;
         SpawnParams.Owner = GetOwner();
-        SpawnParams.Instigator = Cast<APawn>(GetOwner());
+        SpawnParams.Instigator = InstigatorPawn;
 
-        AProjectile* SpawnedProjectile = World->SpawnActor<AProjectile>(
-            Projectile, 
-            MuzzleLocation, 
-            FireDirection.Rotation(), 
-            SpawnParams
-        );
-
-        if (SpawnedProjectile)
+        if (InstigatorPawn && InstigatorPawn->HasAuthority()) // Only server spawns the projectile
         {
-            // // Set the projectile's initial speed or other properties
-            // SpawnedProjectile->GetProjectileMovementComponent()->Velocity = FireDirection * SpawnedProjectile->GetProjectileSpeed();
+            AProjectile* SpawnedProjectile = World->SpawnActor<AProjectile>(
+                Projectile,                     // Projectile class
+                SocketTransform.GetLocation(),  // Spawn location
+                TargetRotation,                 // Spawn rotation
+                SpawnParams                     // Spawn parameters
+            );
+
+            if (SpawnedProjectile)
+            {
+                SpawnedProjectile->SetProjectileDamage(GetDamage()); // Pass weapon damage to the projectile
+                UE_LOG(LogTemp, Warning, TEXT("Setting Current Weapon"));
+                SpawnedProjectile->SetCurrentWeapon(this);
+                SpawnedProjectile->InitializeTracer();  // Trigger tracer setup after weapon is set
+            }
         }
     }
-
-    // Spawn muzzle flash
-    if (MuzzleFlash)
-    {
-        UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), MuzzleFlash, MuzzleLocation);
-    }
-
 }
-
-void AAssaultWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-
-    DOREPLIFETIME_CONDITION(AAssaultWeapon, AssaultWeaponAmmoOnHand, COND_OwnerOnly);
-    DOREPLIFETIME_CONDITION(AAssaultWeapon, AssaultWeaponAmmoInMag, COND_OwnerOnly);
-    DOREPLIFETIME(AAssaultWeapon, AssaultWeaponMaxAmmoOnHand);
-    DOREPLIFETIME(AAssaultWeapon, AssaultWeaponMagCapacity);
-}
-
-// void AAssaultWeapon::HandleFire(const FVector& HitTarget, const FVector& MuzzleLocation)
-// {
-//     Super::HandleFire(HitTarget, MuzzleLocation);
-    
-//     FVector FireDirection = (HitTarget - MuzzleLocation).GetSafeNormal();
-
-//     if (Projectile)
-//     {
-//         FActorSpawnParameters SpawnParams;
-//         SpawnParams.Owner = GetOwner();
-//         SpawnParams.Instigator = Cast<APawn>(GetOwner());
-
-//         GetWorld()->SpawnActor<AProjectile>(
-//             Projectile,
-//             MuzzleLocation,
-//             FireDirection.Rotation(),
-//             SpawnParams
-//         );
-//     }
-// }
 
 void AAssaultWeapon::SetAmmo(int32 NewAmmoOnHand, int32 NewAmmoInMag)
 {
@@ -123,7 +84,6 @@ int32 AAssaultWeapon::GetMagCapacity() const
 
 void AAssaultWeapon::ReloadAmmo(int32 AmmoAmount) 
 {
-    UE_LOG(LogTemp, Warning, TEXT("Assault Weapon reload function called"));
     // Update the AssaultWeapon-specific ammo counts
     AssaultWeaponAmmoOnHand += AmmoAmount;
     AssaultWeaponAmmoInMag -= AmmoAmount;
@@ -134,19 +94,6 @@ void AAssaultWeapon::ReloadAmmo(int32 AmmoAmount)
 
 }
 
-float AAssaultWeapon::GetDamage() const
-{
-    return 40.f;
-}
 
-void AAssaultWeapon::OnRep_AssaultWeaponAmmoOnHand()
-{
-    RefreshHUD();
-}
-
-void AAssaultWeapon::OnRep_AssaultWeaponAmmoInMag()
-{
-    RefreshHUD();
-}
 
 

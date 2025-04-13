@@ -3,14 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "BaseMenuWidget.h"
-#include "WBP_BaseMenu.generated.h"
+#include "BaseGameMode.h"
+#include "LobbyGameMode.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class MYZOMBIES_API UWBP_BaseMenu : public UBaseMenuWidget
+class MYZOMBIES_API ALobbyGameMode : public ABaseGameMode
 {
 	GENERATED_BODY()
 	

@@ -3,14 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "BaseMenuWidget.h"
-#include "WBP_BaseMenu.generated.h"
+#include "GameFramework/GameState.h"
+#include "MultiplayerGameState.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class MYZOMBIES_API UWBP_BaseMenu : public UBaseMenuWidget
+class MYZOMBIES_API AMultiplayerGameState : public AGameState
 {
 	GENERATED_BODY()
 	

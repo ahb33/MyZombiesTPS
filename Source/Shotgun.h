@@ -8,6 +8,7 @@
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISense_Hearing.h" 
 #include "Sound/SoundCue.h"
+#include "Projectile.h"
 #include "Shotgun.generated.h"
 
 /**
@@ -64,9 +65,5 @@ private:
 
     UPROPERTY(EditAnywhere, Replicated)
     int32 ShotgunMagCapacity;
-
-	FTransform SocketTransform;
-
-
 
 };

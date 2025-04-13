@@ -10,6 +10,7 @@
 
 ABaseGameMode::ABaseGameMode() {}
 
+// try to alter code so that begin play isnt called while in menu
 void ABaseGameMode::BeginPlay()
 {
     Super::BeginPlay();
@@ -22,15 +23,14 @@ void ABaseGameMode::BeginPlay()
         PlayerController->SetPause(false);
         PlayerController->SetInputMode(FInputModeGameOnly());
         PlayerController->bShowMouseCursor = false;
-    }
-    
+    }    
 }
 
 void ABaseGameMode::InitializeGameplay()
 {
     UE_LOG(LogTemp, Warning, TEXT("Base gameplay initialized."));
 }
-
+ 
 void ABaseGameMode::EndGame(bool bPlayerWon)
 {
     APlayerController* PlayerController = UGameplayStatics::GetPlayerController(this, 0);

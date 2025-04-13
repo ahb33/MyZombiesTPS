@@ -52,20 +52,19 @@ public:
 
 protected:
 
-
+    
+    UPROPERTY(meta = (BindWidget, OptionalWidget = true))
+    class UButton* BackButton; 
 
 	
 private:
 
     // create pointer to OnlinePlugin class to access necessary funtion
-    UPROPERTY(meta = (BindWidget))
+    UPROPERTY(meta = (BindWidget, OptionalWidget = true))
     class UButton* HostButton;
 
-    UPROPERTY(meta = (BindWidget))
+    UPROPERTY(meta = (BindWidget, OptionalWidget = true))
     class UButton* JoinButton;
-
-    UPROPERTY(meta = (BindWidget))
-    class UButton* BackButton;
 
     class UMultiplayerSessions* multiplayerSessionPtr; // pointer to custom mutliplayer plugin class
 

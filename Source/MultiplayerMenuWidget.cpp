@@ -17,6 +17,8 @@ void UMultiplayerMenuWidget::MenuSetup()
     Super::MenuSetup();
     BindButtonEvents(); 
 
+    // retreive gameinstance and store in ref
+    // 
     UGameInstance* GameInstance = GetGameInstance();
     if (GameInstance)
     {
@@ -68,16 +70,20 @@ void UMultiplayerMenuWidget::BindButtonEvents()
     }
 }
 
+// shouldnt host create a session?
 void UMultiplayerMenuWidget::OnHostButtonClicked()
 {
-    // clicking host should take you to separate menu to select game mode 
-    // Death match
-    // battle royale
+    // Ensure widget creation before attempting transition
+    FName GameModeSelectionMenu = "GameModeSelectionMenu";
 
-    if(multiplayerSessionPtr)
+    auto gameModeSelectionMenuWidgetRef = GetGameModeSelectionMenuWidgetClass();
+
+    if (!menuWidgetMap.Contains(GameModeSelectionMenu))
     {
-        multiplayerSessionPtr->CreateSession(4, FString("FreeForAll"));
+        Super::CreateAndStoreWidget(GameModeSelectionMenu, gameModeSelectionMenuWidgetRef);
     }
+
+    TransitionToMenu(GameModeSelectionMenu);
 }
 
 void UMultiplayerMenuWidget::OnJoinButtonClicked()
@@ -127,7 +133,7 @@ void UMultiplayerMenuWidget::OnCreateSession(bool bWasSuccessful)
         {
             GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("BWasSuccessful, OnCreateSession being called"));
         }
-        UGameplayStatics::OpenLevel(this, FName("SoloLevel"));  // Replace with actual level name
+        UGameplayStatics::OpenLevel(this, FName("LobbyLevel"));  // Replace with actual level name
     }
     else
     {
@@ -168,38 +174,7 @@ void UMultiplayerMenuWidget::OnFindSessions(const TArray<FOnlineSessionSearchRes
 
 void UMultiplayerMenuWidget::OnJoinSession(EOnJoinSessionCompleteResult::Type Result)
 {
-    // if (!multiplayerSessionPtr || Result != EOnJoinSessionCompleteResult::Success)
-    // {
-    //     if (GEngine)
-    //     {
-    //         GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("Failed to join session."));
-    //     }
-    //     return;
-    // }
 
-    // // Get the connection string from the session
-    // FString ConnectInfo;
-    // if (multiplayerSessionPtr->sessionInterface->GetResolvedConnectString(NAME_GameSession, ConnectInfo))
-    // {
-    //     if (GEngine)
-    //     {
-    //         GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, FString::Printf(TEXT("Joining session at: %s"), *ConnectInfo));
-    //     }
-
-    //     // Travel to the session
-    //     APlayerController* PlayerController = GetGameInstance()->GetFirstLocalPlayerController();
-    //     if (PlayerController)
-    //     {
-    //         PlayerController->ClientTravel(ConnectInfo, ETravelType::TRAVEL_Absolute);
-    //     }
-    // }
-    // else
-    // {
-    //     if (GEngine)
-    //     {
-    //         GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, TEXT("Failed to get connection string for session."));
-    //     }
-    // }
 }
 
 void UMultiplayerMenuWidget::OnDestroySession(bool bWasSuccessful)

@@ -67,6 +67,7 @@ AController* EventInstigator, AActor* DamageCauser)
 {
     if (HasAuthority()) // Ensure damage is processed only on the server
     {
+        UE_LOG(LogTemp, Warning, TEXT("Enemy %s took damage: %f"), *GetName(), DamageAmount);
         BaseHealth -= DamageAmount;
         UE_LOG(LogTemp, Warning, TEXT("Enemy BaseHealth is now: %f"), BaseHealth);
 

@@ -50,19 +50,36 @@ void AMyPlayerController::SetHUDHealth(float CurrentHealth, float MaxHealth)
 
 void AMyPlayerController::SetHUDAmmo(int32 Ammo)
 {
-    // Check if HUD is valid
-    if(MyPlayerHUD == nullptr)
+
+    if (MyPlayerHUD == nullptr)
     {
         MyPlayerHUD = Cast<AMyHUD>(GetHUD());
+        UE_LOG(LogTemp, Warning, TEXT("MyPlayerHUD initialized: %s"), MyPlayerHUD ? TEXT("Valid") : TEXT("Null"));
     }
 
-    // Check if CharacterStats and AmmoOnDisplay are valid
-    if(MyPlayerHUD && MyPlayerHUD->CharacterStats && MyPlayerHUD->CharacterStats->AmmoOnDisplay)
+    if (MyPlayerHUD)
     {
-        FString AmmoText = FString::Printf(TEXT("%d"), Ammo);
-        MyPlayerHUD->CharacterStats->AmmoOnDisplay->SetText(FText::FromString(AmmoText));
+        if (MyPlayerHUD->CharacterStats)
+        {
+            if (MyPlayerHUD->CharacterStats->AmmoOnDisplay)
+            {
+                FString AmmoText = FString::Printf(TEXT("%d"), Ammo);
+                MyPlayerHUD->CharacterStats->AmmoOnDisplay->SetText(FText::FromString(AmmoText));
+            }
+            else
+            {
+                UE_LOG(LogTemp, Warning, TEXT("AmmoOnDisplay is NULL."));
+            }
+        }
+        else
+        {
+            UE_LOG(LogTemp, Warning, TEXT("CharacterStats is NULL."));
+        }
     }
-
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("MyPlayerHUD is NULL."));
+    }
 }
 
 void AMyPlayerController::SetHUDMagAmmo(int32 AmmoInMag)

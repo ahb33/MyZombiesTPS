@@ -5,9 +5,10 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "MyHUD.h"
-#include "WeaponTypes.h"
-#include "CombatState.h"
+#include "CombatState.h"       
 #include "CombatComponent.generated.h"
+
+
 
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
@@ -24,47 +25,70 @@ public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-
 	/* Firing Weapon   */
 	void FireButtonPressed(bool bPressed);
 	void Fire();
 
-		/** Weapon Equipping */
-	void EquipWeapon(AWeapon* NewWeapon);
-	void EquipPrimaryWeapon(AWeapon* PrimaryWeapon);
-	void EquipSecondaryWeapon(AWeapon* Character);
+	/** Weapon Equipping */
+	void EquipWeapon(class AWeapon*);
+	void EquipSecondaryWeapon(class AWeapon*);
 	void SwapWeapons();
+
+    
+    /** Weapon Reloading */
+    void Reload();
+    void FinishReloading();
+    int32 AmmoToReload();
+	virtual void ReloadAmmo(int32 Ammo) {};
 
 	/** Utilities */
     void AttachActorToRightHand(AActor* ActorToAttach);
     void AttachWeaponToWeaponSocket(AActor* WeaponToAttach);
-	AWeapon* GetEquippedWeapon() const { return PrimaryWeapon; }
-    EWeaponType GetWeaponType() const {return WeaponType;}
+	class AWeapon* GetEquippedWeapon() const { return EquippedWeapon; }
+    void SetAiming(bool bIsAiming);
+    bool ShouldSwapWeapons() const;
+    void SetCombatState(ECombatState State);
+    ECombatState GetCombatState() const { return CombatState; }
+    void TraceUnderCrosshairs(FHitResult& HitResult);
+    void TraceFromCamera(FHitResult& HitResult);
+    void TraceFromMuzzle(FHitResult& HitResult);
+    bool IsCameraObstructed() const;
+    void HandleZoom(float DeltaTime); // will be called in tick
+
+    void SetZooming(bool bIsZooming);
+    bool IsZooming() const { return bZooming; }
+
+    UFUNCTION()
+    void OnRep_CombatState();
+    void SetHUDCrosshairs(float DeltaTime);
+
+    /** Server Functions */
+    UFUNCTION(Server, Reliable)
+    void ServerReload();
 
 
 
 protected:
-	// Called when the game starts
-	virtual void BeginPlay() override;
+    virtual void BeginPlay() override;
+
+    UFUNCTION(Server, Reliable)
+    void ServerSetAiming(bool bIsAiming);
+
+    // Replication
+    UFUNCTION()
+    void OnRep_Aiming();
 
 private:	
-
 
     // Weapon References
     UPROPERTY(Replicated)
     class AWeapon* EquippedWeapon;
 
     UPROPERTY(Replicated)
-    class AWeapon* PrimaryWeapon;
-
-    UPROPERTY(Replicated)
     class AWeapon* SecondaryWeapon;
 
     // Character and Controller References
-    UPROPERTY()
     class AMainCharacter* MainCharacter;
-
-    UPROPERTY()
     class AMyPlayerController* Controller;
 
     UPROPERTY()
@@ -91,15 +115,35 @@ private:
     UPROPERTY(EditAnywhere, Category = Crosshairs)
     UTexture2D* CrosshairsBottom;
 
-    // Weapon State and Aiming
-    UPROPERTY(Replicated, EditAnywhere, Category = "Weapon Type")
-    EWeaponType WeaponType;
+    UPROPERTY(ReplicatedUsing = OnRep_Aiming)
+    bool bAiming;
+
+    UPROPERTY()
+    bool bZooming;
+
+    UPROPERTY(EditAnywhere, Category = "Combat")
+    float ZoomedFOV = 65.0f; // will change based on weapon
+
+    UPROPERTY(EditAnywhere, Category = "Combat")
+    float ZoomInterpSpeed = 20.0f; // Speed for FOV interpolation
+
+    UPROPERTY(EditAnywhere, Category = "Combat")
+    float DefaultFOV = 90.0f; // FOV when not aiming; set in BeginPlay
+
+    float CurrentFOV;
+
+    UPROPERTY(ReplicatedUsing = OnRep_CombatState)
+    ECombatState CombatState;
+
+    /** Other Utility Variables */
+    bool bCanFire; // Indicates if the weapon is reloading.
+    bool bFireButtonPressed;
+    bool bIsReloading;
 
     FVector LocalHitTarget;
 
-    // UPROPERTY(ReplicatedUsing = OnRep_CombatState)
-    // ECombatState CombatState;
+    /** Timer Handles */
+    FTimerHandle ReloadTimerHandle;
 
-    // Fire Control
-    bool bFireButtonPressed;
+
 };

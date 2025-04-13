@@ -11,7 +11,15 @@ void UBaseMenuWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 
+    playerController = Cast<AMyPlayerController>(GetWorld()->GetFirstPlayerController());
+
+    if (!playerController)
+    {
+        UE_LOG(LogTemp, Error, TEXT("UBaseMenuWidget::NativeConstruct: Failed to get player controller!"));
+    }
 }
+
+
 
 void UBaseMenuWidget::TransitionToMenu(FName MenuName)
 {
@@ -62,16 +70,20 @@ void UBaseMenuWidget::MenuSetup()
 
 void UBaseMenuWidget::SetupInputMode()
 {
-    if (playerController)
+    if (!playerController)
     {
-        FInputModeUIOnly InputModeData;
-        InputModeData.SetWidgetToFocus(TakeWidget());
-        InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-
-        playerController->SetInputMode(InputModeData);
-        playerController->bShowMouseCursor = true;
+        UE_LOG(LogTemp, Error, TEXT("SetupInputMode: playerController is NULL!"));
+        return;
     }
-}
 
+    UE_LOG(LogTemp, Warning, TEXT("Player Controller valid - SetUpInputMode called"));
+    FInputModeUIOnly InputModeData;
+    InputModeData.SetWidgetToFocus(nullptr);
+    InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+
+    playerController->SetInputMode(InputModeData);
+    playerController->bShowMouseCursor = true;
+    UE_LOG(LogTemp, Warning, TEXT("SetupInputMode called - Mouse cursor visible."));
+}
 
 

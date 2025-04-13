@@ -62,26 +62,20 @@ void AMainCharacter::BeginPlay()
 {
     Super::BeginPlay();
 
-    // Initialize Player Controller
     MyPlayerController = Cast<AMyPlayerController>(GetController());
-    if (!MyPlayerController)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Failed to initialize MyPlayerController"));
-    }
-    else
+    if (MyPlayerController)
     {
         MyPlayerController->SetHUDHealth(PlayerHealth, MaxHealth);
-    }
 
-    // Initialize HUD
-    MyGameHUD = Cast<AMyHUD>(GetWorld()->GetFirstPlayerController()->GetHUD());
-    if (!MyGameHUD)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Failed to initialize MyGameHUD"));
+        MyGameHUD = Cast<AMyHUD>(MyPlayerController->GetHUD());
+        if (MyGameHUD)
+        {
+            MyGameHUD->AddCharacterStats();
+        }
     }
     else
     {
-        MyGameHUD->AddCharacterStats();
+        UE_LOG(LogTemp, Warning, TEXT("Failed to initialize MyPlayerController"));
     }
 
 }
@@ -112,6 +106,8 @@ void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	PlayerInputComponent->BindAction("Reload", IE_Released, this, &AMainCharacter::ReloadButtonPressed);
 
 	PlayerInputComponent->BindAction("PickUp", IE_Pressed, this, &AMainCharacter::PickUpButtonPressed);
+    PlayerInputComponent->BindAction("Zoom", IE_Pressed, this, &AMainCharacter::ZoomButtonPressed);
+    PlayerInputComponent->BindAction("Zoom", IE_Released, this, &AMainCharacter::ZoomButtonReleased);
 
 
 
@@ -314,7 +310,22 @@ void AMainCharacter::PickUpButtonPressed()
 
 }
 
-// re-engineer
+void AMainCharacter::ZoomButtonPressed()
+{
+    if (combatComponent)
+    {
+        combatComponent->SetZooming(true); // Trigger zooming
+    }
+}
+
+void AMainCharacter::ZoomButtonReleased()
+{
+    if (combatComponent)
+    {
+        combatComponent->SetZooming(false); // Stop zooming
+    }
+}
+
 void AMainCharacter::FireButtonPressed()
 {
 	if(combatComponent)
@@ -324,7 +335,6 @@ void AMainCharacter::FireButtonPressed()
 
 }
 
-// re-engineer
 void AMainCharacter::FireButtonReleased()
 {
 	if(combatComponent)
@@ -335,8 +345,10 @@ void AMainCharacter::FireButtonReleased()
 
 void AMainCharacter::ReloadButtonPressed()
 {
-
-
+    if(combatComponent)
+	{
+		combatComponent->Reload();
+	}
 }
 
 void AMainCharacter::AimButtonPressed()
@@ -494,9 +506,8 @@ void AMainCharacter::OnRep_Health()
 
 ECombatState AMainCharacter::GetCharacterCombatState() const
 {
-	// if (combatComponent == nullptr) 
-    return ECombatState::ECS_MAX;
-	// return combatComponent->GetcombatComponentState(); 
+	if (combatComponent == nullptr) return ECombatState::ECS_MAX;
+	return combatComponent->GetCombatState();
 }
 
 

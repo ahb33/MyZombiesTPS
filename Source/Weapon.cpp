@@ -10,6 +10,7 @@
 #include "WeaponTypes.h"
 #include "MyHUD.h"
 #include "MyPlayerController.h"
+#include "MainCharacter.h"
 #include "DrawDebugHelpers.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/CharacterMovementComponent.h" 
@@ -19,16 +20,12 @@
 
 // Sets default values
 AWeapon::AWeapon()
-    : bAiming(false),
+    : Damage(0.f),        
       AmmoOnHand(0),
       MaxAmmoOnHand(0),
       ReloadAmount(0),
       AmmoInMag(0),
-      MagCapacity(0),
-      WeaponState(EWeaponState::EWS_Unequipped),
-      bReloading(false),
-      bFireButtonPressed(false),
-      bCanFire(true)
+      MagCapacity(0)
 {
     // Enable replication and ticking
     bReplicates = true;
@@ -58,7 +55,6 @@ void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(AWeapon, bAiming);
 
 	/*We'd like ammo on hand and the ammo in the magazine to be replicated on all clients in case one player picked up a used weapon
 	  then you want the ammo count on that weapon to remain unchanged
@@ -70,15 +66,14 @@ void AWeapon::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeP
     DOREPLIFETIME(AWeapon, MaxAmmoOnHand);
     DOREPLIFETIME(AWeapon, ReloadAmount);
     DOREPLIFETIME(AWeapon, WeaponState);
- 
-	
-
-
+    DOREPLIFETIME(AWeapon, WeaponType);
+    
 }
 // Called when the game starts or when spawned
 void AWeapon::BeginPlay()
 {
 	Super::BeginPlay();
+
 
 	if(HasAuthority())
 	{
@@ -106,6 +101,7 @@ void AWeapon::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 
+
 }				
 
 void AWeapon::OnSphereOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
@@ -128,51 +124,6 @@ void AWeapon::OnSphereEndOverlap(UPrimitiveComponent* OverlappedComponent, AActo
 	}
 }
 
-void AWeapon::InitializeCharacterAndController()
-{
-    AActor* OwnerActor = GetOwner();
-    if (!OwnerActor)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("AWeapon::InitializeCharacterAndController - Owner is null"));
-        return;
-    }
-
-    else
-    {
-        UE_LOG(LogTemp, Warning, TEXT("OwnerActor is valid"));
-    }
-
-    MainCharacter = Cast<AMainCharacter>(OwnerActor);
-    if (!MainCharacter)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("AWeapon::InitializeCharacterAndController - MainCharacter is null"));
-        return;
-    }
-
-    // Ensure HUD updates for the owning player
-    RefreshHUD();
-}
-
-
-// void AWeapon::OnRep_Aiming()
-// {
-// 	if (MainCharacter && MainCharacter->IsLocallyControlled())
-// 	{
-// 		bAiming = true;
-// 	}
-// }
-
-
-
-
-
-bool AWeapon::ShouldSwapWeapons() const
-{
-    return false;
-}
-
-
-
 void AWeapon::DropWeapon()
 {
     // Detach the weapon from the character's hand socket
@@ -185,43 +136,15 @@ void AWeapon::DropWeapon()
     ShowPickUpWidget(true);
 }
 
-
-
-
-void AWeapon::Fire(const FVector& HitTarget)
+void AWeapon::Fire(const FVector& HitTargetParam)
 {
-    if (WeaponIsEmpty() || !GetOwner() || !GetWeaponMesh())
+    if (!GetOwner() || !GetWeaponMesh())
     {
         UE_LOG(LogTemp, Warning, TEXT("Cannot fire: Weapon is empty or invalid owner/mesh."));
         return;
     }
     
-    FVector MuzzleLocation = GetMuzzleLocation();
-
-    HandleFire(HitTarget, MuzzleLocation);
-
-    SpawnMuzzleEffect(MuzzleLocation);
-}
-
-
-void AWeapon::HandleFire(const FVector& HitTarget, const FVector& MuzzleLocation)
-{
-    UE_LOG(LogTemp, Warning, TEXT("RoundFired( ) called"));
     RoundFired();
-}
-
-FVector AWeapon::GetMuzzleLocation() const
-{
-    const USkeletalMeshSocket* MuzzleSocket = GetWeaponMesh()->GetSocketByName(FName("MuzzleFlash"));
-    return MuzzleSocket ? MuzzleSocket->GetSocketLocation(GetWeaponMesh()) : FVector::ZeroVector;
-}
-
-void AWeapon::SpawnMuzzleEffect(const FVector& MuzzleLocation)
-{
-    if (MuzzleFlash)
-    {
-        UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), MuzzleFlash, MuzzleLocation);
-    }
 }
 
 void AWeapon::DealDamage(const FHitResult &HitResult)
@@ -249,7 +172,6 @@ void AWeapon::RoundFired()
 
     if (CurrentAmmoOnHand > 0) 
     {
-        UE_LOG(LogTemp, Warning, TEXT("RoundFired called"));
         // Reduce the ammo count in the specific weapon instance
         SetAmmo(CurrentAmmoOnHand - 1, GetCurrentAmmoInMag());
 
@@ -262,12 +184,6 @@ void AWeapon::RoundFired()
     }
 }
 
-/*
-If on client should then you should send RPC to server so 
-that the server knows to check to make sure 
-we can reload before informing clients they can 
-reload before its time to play reload animation	
-*/
 
 void AWeapon::ShowPickUpWidget(bool bShowWidget)
 {
@@ -277,93 +193,6 @@ void AWeapon::ShowPickUpWidget(bool bShowWidget)
 	}
 }
 
-void AWeapon::SetAiming(bool bIsAiming)
-{
-    if (!HasAuthority())
-    {
-        // We are on the client, so request the server to set the value
-        ServerSetAiming(bIsAiming);
-    }
-
-    // The server will set the value here or in ServerSetAiming_Implementation
-    bAiming = bIsAiming;
-}
-
-
-void AWeapon::ServerSetAiming_Implementation(bool bIsAiming)
-{
-	bAiming = bIsAiming;
-}
-
-void AWeapon::Reload()
-{    
-    UE_LOG(LogTemp, Warning, TEXT("Reload() function called"));
-
-    // Check if ammo is greater than 0
-    if (AmmoInMag > 0)
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Calling reload functions"));
-        ServerReload();
-    }
-}
-
-void AWeapon::ServerReload_Implementation()
-{
-    UE_LOG(LogTemp, Warning, TEXT("Server Reload function called"));
-
-    if (MainCharacter == nullptr) return;
-
-
-    MainCharacter->PlayReloadMontage();
-
-    int32 AmmoReload = AmmoToReload();
-
-    // Update ammo counts
-    ReloadAmmo(AmmoReload);
-    RefreshHUD();
-    bReloading = true;
-
-    float ReloadDuration = MainCharacter->GetReloadDuration();
-    GetWorld()->GetTimerManager().SetTimer(ReloadTimerHandle, this, &AWeapon::FinishReloading, ReloadDuration, false);
-}
-
-void AWeapon::FinishReloading()
-{
-    UE_LOG(LogTemp, Warning, TEXT("FinishReloading() function called"));
-    if (MainCharacter == nullptr) 
-    {   
-        UE_LOG(LogTemp, Warning, TEXT("MainCharacter is nullptr"));
-        return;
-    }   
-    if (MainCharacter->HasAuthority())
-    {   
-        UE_LOG(LogTemp, Warning, TEXT("Main Character does not have authority"));
-    }
-    if (bFireButtonPressed)
-    {
-        // bool bFire = true;
-        // FireButtonPressed(bFire);
-        // UE_LOG(LogTemp, Warning, TEXT("FireButtonPressed called with bFire = true"));
-    }
-	
-	UE_LOG(LogTemp, Warning, TEXT("bReloading set to false in FinishReloading"));
-}
-
-
-int32 AWeapon::AmmoToReload()
-{
-    int32 CurrentAmmoOnHand = GetCurrentAmmoOnHand();
-    int32 CurrentAmmoInMag = GetCurrentAmmoInMag();
-    MaxAmmoOnHand = GetMaxAmmoOnHand();
-
-    int32 MaxReloadAmount = MaxAmmoOnHand - CurrentAmmoOnHand;
-    int32 AmmoToReload = FMath::Min(MaxReloadAmount, CurrentAmmoInMag);
-
-    return AmmoToReload;
-}
-
-
-
 void AWeapon::RefreshHUD()
 {
     if (MainCharacter)
@@ -371,7 +200,6 @@ void AWeapon::RefreshHUD()
         AMyPlayerController* PlayerController = Cast<AMyPlayerController>(MainCharacter->GetController());
         if (PlayerController)
         {
-            UE_LOG(LogTemp, Warning, TEXT("PlayerController valid within RefreshHUD"));
             PlayerController->SetHUDAmmo(GetCurrentAmmoOnHand());
             PlayerController->SetHUDMagAmmo(GetCurrentAmmoInMag());
         }
@@ -401,26 +229,30 @@ void AWeapon::SetHUDMagAmmo(int32 MagAmmo)
     }
 }
 
-// replicating ammo on client
-void AWeapon::OnRep_AmmoOnHand()
-{	
-	if(MainCharacter == nullptr)
-	{
-		Cast<AMainCharacter>(GetOwner());
-		SetHUDAmmo(GetCurrentAmmoOnHand());
-	}
+void AWeapon::SetOwner(AActor* NewOwner)
+{
+    Super::SetOwner(NewOwner);
+    MainCharacter = Cast<AMainCharacter>(NewOwner);
+    if (MainCharacter)
+    {
+        RefreshHUD();
+    }
+    else
+    {
+        MainCharacter = nullptr;
+    }
 }
 
-// replicating ammo on client
+void AWeapon::OnRep_AmmoOnHand()
+{
+    UE_LOG(LogTemp, Warning, TEXT("OnRep_AmmoOnHand: AmmoOnHand = %d"), AmmoOnHand);
+    RefreshHUD();
+}
+
 void AWeapon::OnRep_AmmoInMag()
-{	
-	if(MainCharacter == nullptr)
-	{
-		Cast<AMainCharacter>(GetOwner());
-		SetHUDMagAmmo(AmmoInMag);
-	}
-
-
+{
+    UE_LOG(LogTemp, Warning, TEXT("OnRep_AmmoInMag: AmmoInMag = %d"), AmmoInMag);
+    RefreshHUD();
 }
 
 void AWeapon::SetAmmoInMag()
@@ -451,10 +283,6 @@ void AWeapon::OnRep_Owner()
     }
 }
 
-
-
-
-
 void AWeapon::SetWeaponState(EWeaponState State)
 {
 	WeaponState = State;
@@ -471,7 +299,6 @@ void AWeapon::OnRep_WeaponState()
 			WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			WeaponMesh->SetSimulatePhysics(false);
 			WeaponMesh->SetEnableGravity(false);
-			WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			// Perform additional actions when the weapon is equipped
 			break;
 
@@ -481,7 +308,6 @@ void AWeapon::OnRep_WeaponState()
 			WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 			WeaponMesh->SetSimulatePhysics(false);
 			WeaponMesh->SetEnableGravity(false);
-			WeaponMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
             break;
 
 		case EWeaponState::EWS_Dropped:
@@ -494,9 +320,6 @@ void AWeapon::OnRep_WeaponState()
 			WeaponMesh->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Ignore);
 			// Perform additional actions when the weapon is unequipped
 			break;
-		//case EWeaponState::EWS_EquippedSecondary:
-		//	OnEquippedSecondary();
-		//	break;
-
 	}
 }
+

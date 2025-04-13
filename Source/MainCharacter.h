@@ -4,7 +4,6 @@
 #include "GameFramework/Character.h"
 #include "TurnInPlace.h"
 #include "CombatState.h"
-#include "WeaponTypes.h"
 #include "MainCharacter.generated.h"
 
 UCLASS()
@@ -33,6 +32,7 @@ public:
     FORCEINLINE float GetCharacterYaw() const { return AO_Yaw; }
     FORCEINLINE float GetCharacterPitch() const { return AO_Pitch; }
     FORCEINLINE ETurningInPlace GetTurningInPlace() const { return TurningInPlace; }
+    FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
     float GetReloadDuration() const;
     FVector GetHitTarget() const;
     class AMyPlayerController* GetMyPlayerController() const { return MyPlayerController; }
@@ -50,6 +50,8 @@ public:
     void FireButtonReleased();
     void ReloadButtonPressed();
     void PickUpButtonPressed();
+    void ZoomButtonPressed();
+    void ZoomButtonReleased();
 
     // Replication Functions
     UFUNCTION(Server, Reliable)
