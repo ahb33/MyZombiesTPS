@@ -18,23 +18,12 @@ public:
 	// Sets default values for this actor's properties
 	AProjectile();
 
-
     FORCEINLINE float GetProjectileSpeed() const { return ProjectileSpeed; } // Getter for projectile speed
+
+    void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const;
 
     UPROPERTY(VisibleAnywhere, Category = Projectile)
     class USphereComponent* CollisionSphere;
-
-    UPROPERTY(EditAnywhere, Category = Projectile)
-    class UParticleSystem* Tracer;
-
-    UPROPERTY(EditAnywhere, Category = Projectile)
-    UParticleSystemComponent* TracerSystem;
-
-    UPROPERTY(EditAnywhere)
-    UParticleSystem* ImpactParticles;
-
-    UPROPERTY(EditAnywhere)
-    USoundCue* ImpactSound;
 
 	/*We need to have some sort of hit event that will occur when projectile hits something
 	we'd like to have function called in response to a hit event*/
@@ -44,6 +33,10 @@ public:
 
 	FORCEINLINE class UProjectileMovementComponent* GetProjectileMovementComponent() const { return ProjectileMovementComponent; }
 
+    void SetProjectileDamage(float Damage) { DamageAmount = Damage; }
+    void SetCurrentWeapon(class AWeapon* Weapon) { currentWeapon = Weapon; }
+    void InitializeTracer();
+    
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -51,15 +44,18 @@ protected:
 
 private:	
 
+    class AWeapon* currentWeapon;
+
+    UPROPERTY(EditAnywhere, Category = Projectile)
+    UParticleSystemComponent* TracerSystem;
+
 	UPROPERTY(EditAnywhere)
 	class UProjectileMovementComponent* ProjectileMovementComponent;
 
 	UPROPERTY(EditAnywhere, Category = "Projectile|Movement")
 	float ProjectileSpeed;
 
-	UPROPERTY(EditAnywhere, Category = "Projectile|Movement")
-	int DamageAmount;
-
-
+    UPROPERTY(Replicated, EditAnywhere, Category = "Projectile|Damage")
+    float DamageAmount;
 
 };

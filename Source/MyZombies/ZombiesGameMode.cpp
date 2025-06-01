@@ -4,6 +4,7 @@
 #include "ZombiesGameMode.h"
 #include "EnemyCharacter.h"
 #include "AI_EnemySpawner.h"
+#include "MyPlayerController.h"
 #include "Kismet/GameplayStatics.h"
 
 AZombiesGameMode::AZombiesGameMode()
@@ -14,27 +15,33 @@ AZombiesGameMode::AZombiesGameMode()
 
 void AZombiesGameMode::BeginPlay()
 {
-    
-
-    // Ensure the PlayerController possesses the correct pawn
-    APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
-    if (PlayerController && !PlayerController->GetPawn())
-    {
-        APawn* SpawnedPawn = GetWorld()->SpawnActor<APawn>(DefaultPawnClass, FVector::ZeroVector, FRotator::ZeroRotator);
-        if (SpawnedPawn)
-        {
-            PlayerController->Possess(SpawnedPawn);
-            UE_LOG(LogTemp, Warning, TEXT("MainCharacter possessed in ZombiesGameMode."));
-        }
-        else
-        {
-            UE_LOG(LogTemp, Error, TEXT("Failed to spawn or possess pawn in ZombiesGameMode."));
-        }
-    }
     Super::BeginPlay();
+
+    if (AMyPlayerController* PC = Cast<AMyPlayerController>(UGameplayStatics::GetPlayerController(this, 0)))
+    {
+        PossessCharacterIfNone(PC);
+        SetupInputForGameplay(PC);
+    }
+
     ApplyLevelModifiers();
     StartNextWave();
 }
+
+void AZombiesGameMode::PossessCharacterIfNone(APlayerController* PC)
+{
+    if (!PC->GetPawn() && DefaultPawnClass)
+    {
+        APawn* Pawn = GetWorld()->SpawnActor<APawn>(DefaultPawnClass, FVector::ZeroVector, FRotator::ZeroRotator);
+        if (Pawn) PC->Possess(Pawn);
+    }
+}
+
+void AZombiesGameMode::SetupInputForGameplay(APlayerController* PC)
+{
+    PC->SetInputMode(FInputModeGameOnly());
+    PC->bShowMouseCursor = false;
+}
+
 void AZombiesGameMode::OnZombieKilled()
 {
     UE_LOG(LogTemp, Warning, TEXT("Zombie killed"));

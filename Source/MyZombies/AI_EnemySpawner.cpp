@@ -5,6 +5,9 @@
 #include "ZombiesGameMode.h"
 #include "Components/BoxComponent.h"
 
+
+// to fix spawning issues, we might have to tell spawner to generate pickups only if they have the authority to do so
+
 // Sets default values
 AAI_EnemySpawner::AAI_EnemySpawner()
 {

@@ -29,6 +29,11 @@ public:
 
     void SetHUDMagAmmo(int32 AmmoInMag);
 
+    UFUNCTION(Server, Reliable, BlueprintCallable)
+    void TravelToLobby();
+
+
+
 protected:
     
     virtual void BeginPlay() override;

@@ -17,8 +17,7 @@ class MYZOMBIES_API AAssaultWeapon : public AWeapon
 
 public:
 
-    virtual void HandleFire(const FVector& HitTarget, const FVector& MuzzleLocation) override;
-
+    virtual void Fire(const FVector& Hit); // Virtual for child class overrides.
 
 	virtual void SetAmmo(int32 NewAmmoOnHand, int32 NewAmmoInMag) override;
 
@@ -32,22 +31,20 @@ public:
 
 	virtual void ReloadAmmo(int32 Ammo) override;
 
-	virtual float GetDamage() const override; 
-
-
+	virtual float GetDamage() const override {return Damage;}
 private:
 
-	UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere)
 	int32 AssaultWeaponAmmoOnHand; // 
 
-	UPROPERTY(EditAnywhere)
+    UPROPERTY(EditAnywhere)
 	int32 AssaultWeaponAmmoInMag; // 
 
-	UPROPERTY(EditAnywhere)
-	int32 AssaultWeaponMaxAmmoOnHand; // 
+    UPROPERTY(EditAnywhere)
+    int32 AssaultWeaponMaxAmmoOnHand;
 
-	UPROPERTY(EditAnywhere)
-	int32 AssaultWeaponMagCapacity; // 
+    UPROPERTY(EditAnywhere)
+    int32 AssaultWeaponMagCapacity;
 
 	FTransform SocketTransform;
 };

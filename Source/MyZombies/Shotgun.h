@@ -8,6 +8,7 @@
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISense_Hearing.h" 
 #include "Sound/SoundCue.h"
+#include "Projectile.h"
 #include "Shotgun.generated.h"
 
 /**
@@ -20,7 +21,8 @@ class MYZOMBIES_API AShotgun : public AWeapon
 	
 public:
 
-    virtual void HandleFire(const FVector& HitTarget, const FVector& MuzzleLocation) override;
+
+    virtual void Fire(const FVector& Hit); // Virtual for child class overrides.
 
 	// modify WaponTrace function from Assault Weapon to include scatter 
 	void WeaponTraceWithScatter(const FVector& TraceStart, const FVector& HitTarget, FHitResult& FireHit);
@@ -41,24 +43,27 @@ public:
 
 	FVector CalculateScatterEndPoint(const FVector& MuzzleLocation, const FVector& HitTarget);
 
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION()
+    void OnRep_ShotgunAmmoOnHand();
+
+    UFUNCTION()
+    void OnRep_ShotgunAmmoInMag();
+
+
 private:
 
-	class AMainCharacter* PlayerCharacter;
+    UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_ShotgunAmmoOnHand)
+    int32 ShotgunAmmoOnHand;
 
-	UPROPERTY(EditAnywhere)
-	int32 ShotgunAmmoOnHand; // 
+    UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_ShotgunAmmoInMag)
+    int32 ShotgunAmmoInMag;
 
-	UPROPERTY(EditAnywhere)
-	int32 ShotgunAmmoInMag; // 
+    UPROPERTY(EditAnywhere, Replicated)
+    int32 ShotgunMaxAmmoOnHand;
 
-	UPROPERTY(EditAnywhere)
-	int32 ShotgunMaxAmmoOnHand; // 
-
-	UPROPERTY(EditAnywhere)
-	int32 ShotgunMagCapacity; // 
-
-	FTransform SocketTransform;
-
-
+    UPROPERTY(EditAnywhere, Replicated)
+    int32 ShotgunMagCapacity;
 
 };

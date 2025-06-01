@@ -19,6 +19,8 @@ public:
 	// Function to be overridden in child classes for custom logic
 	virtual void CheckEnemiesAlive();
 
+	bool bUseSeamlessTravel;
+
 protected:
 	virtual void BeginPlay() override;
 

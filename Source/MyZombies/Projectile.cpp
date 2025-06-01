@@ -3,8 +3,12 @@
 
 #include "Projectile.h"
 #include "Kismet/GameplayStatics.h" 
+#include "Net/UnrealNetwork.h"
+#include "Weapon.h"
 #include "Components/SphereComponent.h"
 
+// move tracer, impact particles, and impact sound to weapon.cpp and access them in this class. 
+// each weapon should set its own 
 
 // Sets default values
 AProjectile::AProjectile()
@@ -41,39 +45,69 @@ AProjectile::AProjectile()
 void AProjectile::BeginPlay()
 {
     Super::BeginPlay();
+    UE_LOG(LogTemp, Warning, TEXT("Projectile Spawned- Beginplay called"));
 
-    // Spawn tracer effect if specified
-    if (Tracer)
-    {
-        TracerSystem = UGameplayStatics::SpawnEmitterAttached(Tracer, CollisionSphere);
-    }
+}
+void AProjectile::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+    Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+    DOREPLIFETIME(AProjectile, DamageAmount);
 }
 
-// Function called upon collision
+
 void AProjectile::OnHit(UPrimitiveComponent* HitComponent, AActor* OtherActor, 
 UPrimitiveComponent* OtherComponent, FVector NormalImpulse, const FHitResult& Hit)
 {
+    UE_LOG(LogTemp, Warning, TEXT("Projectile hit %s with damage: %f"), *OtherActor->GetName(), DamageAmount);
+
     // Ensure the projectile doesn't hit itself or its owner
     if (OtherActor && OtherActor != GetOwner())
     {
-        // Apply damage to the hit actor
-        UGameplayStatics::ApplyDamage(OtherActor, DamageAmount, GetInstigatorController(), this, UDamageType::StaticClass());
-
-        // Spawn impact particles at the hit location
-        if (ImpactParticles)
+        if (HasAuthority()) // Only the server applies damage
         {
-            UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactParticles, Hit.ImpactPoint, Hit.ImpactNormal.Rotation());
+            UGameplayStatics::ApplyDamage(
+                OtherActor,
+                DamageAmount,
+                GetInstigatorController(),
+                this,
+                UDamageType::StaticClass()
+            );
         }
 
-        // Play impact sound at the hit location
-        if (ImpactSound)
+        // Disable collision before destroying
+        CollisionSphere->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+        // Spawn impact particles
+        if (currentWeapon && currentWeapon->GetImpactParticles())
         {
-            UGameplayStatics::PlaySoundAtLocation(this, ImpactSound, Hit.ImpactPoint);
+            UGameplayStatics::SpawnEmitterAtLocation(
+                GetWorld(),
+                currentWeapon->GetImpactParticles(),
+                Hit.ImpactPoint,
+                Hit.ImpactNormal.Rotation()
+            );
+        }
+
+        // Play impact sound
+        if (currentWeapon && currentWeapon->GetImpactSound())
+        {
+            UGameplayStatics::PlaySoundAtLocation(
+                this,
+                currentWeapon->GetImpactSound(),
+                Hit.ImpactPoint
+            );
         }
 
         // Destroy the projectile after impact
         Destroy();
     }
 }
-
+void AProjectile::InitializeTracer()
+{
+    if (currentWeapon && currentWeapon->GetTracer())
+    {
+        TracerSystem = UGameplayStatics::SpawnEmitterAttached(currentWeapon->GetTracer(), CollisionSphere);
+    }
+}
 

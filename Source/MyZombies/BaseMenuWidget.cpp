@@ -11,10 +11,39 @@ void UBaseMenuWidget::NativeConstruct()
 {
     Super::NativeConstruct();
 
+
+    // Skip only on *dedicated* servers
+    if (!GetWorld() || GetWorld()->IsNetMode(NM_DedicatedServer) || !GetOwningPlayer())
+    {
+        return;
+    }
+
+    if (APlayerController* PC = GetOwningPlayer())
+    {
+        playerController = Cast<AMyPlayerController>(PC);
+        if (playerController)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("BaseMenuWidget: Successfully cast and stored player controller."));
+        }
+        else
+        {
+            UE_LOG(LogTemp, Error, TEXT("BaseMenuWidget: Failed to cast to AMyPlayerController."));
+        }
+    }
+
+    if (!playerController)
+    {
+        UE_LOG(LogTemp, Error, TEXT("UBaseMenuWidget::NativeConstruct: Failed to get player controller!"));
+        return;
+    }
 }
+
+
 
 void UBaseMenuWidget::TransitionToMenu(FName MenuName)
 {
+    if (IsRunningDedicatedServer()) return;  // Skip on server
+
     // Check if the widget is already created and stored
     if (UUserWidget** FoundWidget = menuWidgetMap.Find(MenuName))
     {
@@ -23,7 +52,6 @@ void UBaseMenuWidget::TransitionToMenu(FName MenuName)
             // Remove the current widget and display the new one
             RemoveFromParent();  // Ensure removal from the viewport
             (*FoundWidget)->AddToViewport();  // Add the found widget to the viewport
-            SetupInputMode();  // Set input mode for the new widget
             return;
         }
     }
@@ -35,7 +63,8 @@ void UBaseMenuWidget::TransitionToMenu(FName MenuName)
 
 void UBaseMenuWidget::CreateAndStoreWidget(FName MenuName, TSubclassOf<UUserWidget> WidgetClass)
 {
-    
+    if (IsRunningDedicatedServer()) return;  // Skip on server
+
     if (WidgetClass && !menuWidgetMap.Contains(MenuName))
     {
         UUserWidget* NewWidget = CreateWidget<UUserWidget>(GetWorld(), WidgetClass);
@@ -48,30 +77,41 @@ void UBaseMenuWidget::CreateAndStoreWidget(FName MenuName, TSubclassOf<UUserWidg
 
 void UBaseMenuWidget::MenuSetup()
 {
+    if (IsRunningDedicatedServer()) return;  // Skip on server
+
     // Check if the widget is already in the viewport
     if (!IsInViewport())
     {
         AddToViewport();
-        SetupInputMode();  // Ensure input mode is set
+        if(playerController)
+        {
+            SetupInputMode();  // Ensure input mode is set
+            
+        }
     }
     else
     {
-        UE_LOG(LogTemp, Warning, TEXT("BaseMenu is already in the viewport, skipping AddToViewport"));
+        // UE_LOG(LogTemp, Warning, TEXT("BaseMenu is already in the viewport, skipping AddToViewport"));
     }
 }
 
 void UBaseMenuWidget::SetupInputMode()
 {
-    if (playerController)
+    if (IsRunningDedicatedServer()) return;  // Skip on server
+
+    if (!playerController)
     {
-        FInputModeUIOnly InputModeData;
-        InputModeData.SetWidgetToFocus(TakeWidget());
-        InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-
-        playerController->SetInputMode(InputModeData);
-        playerController->bShowMouseCursor = true;
+        UE_LOG(LogTemp, Error, TEXT("SetupInputMode: playerController is NULL!"));
+        return;
     }
-}
 
+    UE_LOG(LogTemp, Warning, TEXT("Player Controller valid - SetUpInputMode called"));
+    FInputModeUIOnly InputModeData;
+    InputModeData.SetWidgetToFocus(nullptr);
+    InputModeData.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+    playerController->bShowMouseCursor = true;
+    playerController->SetInputMode(InputModeData);
+    UE_LOG(LogTemp, Warning, TEXT("SetupInputMode called - Mouse cursor visible."));
+}
 
 

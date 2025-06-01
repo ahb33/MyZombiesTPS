@@ -3,8 +3,7 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/**",
-                "C:/Program Files/Epic Games/UE_5.3/Engine/Source/**"
+                "${workspaceFolder}/**"
             ],
             "defines": [
                 "_DEBUG",

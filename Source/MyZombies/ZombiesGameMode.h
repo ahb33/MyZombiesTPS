@@ -22,6 +22,9 @@ public:
 	UFUNCTION()
 	void OnZombieKilled();
 
+    void PossessCharacterIfNone(class APlayerController* PC);
+    void SetupInputForGameplay(class APlayerController* PC);
+
 
 
 protected:

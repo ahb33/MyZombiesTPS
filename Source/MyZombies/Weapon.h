@@ -8,18 +8,18 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "WeaponState.h"
+#include "WeaponTypes.h"
 #include "MyHUD.h"
+#include "Particles/ParticleSystem.h" 
+#include "Sound/SoundCue.h"
 #include "Delegates/DelegateCombinations.h"
 #include "Casing.h"
 #include "Weapon.generated.h"
 
 
-/*
-    worry about equipping properly then firing
-    overlapping weapon should set it in SetOverlappingWeapon
-*/
 
 
+constexpr float TRACE_LENGTH = 10000.f;
 
 UCLASS()
 class MYZOMBIES_API AWeapon : public AActor
@@ -37,31 +37,17 @@ public:
     /** UI Interaction */
     void ShowPickUpWidget(bool bShowWidget);
 
-
-
     void DropWeapon();
 
     /** HUD and Crosshair */
-    void SetHUDCrosshairs(float DeltaTime);
     void RefreshHUD();
     void SetHUDAmmo(int32 Ammo);
     void SetHUDMagAmmo(int32 MagAmmo);
 
     
-    // reload 
     /** Weapon Firing */
     virtual void Fire(const FVector& Hit); // Virtual for child class overrides.
     void RoundFired();
-    void SpawnMuzzleEffect(const FVector& MuzzleLocation);
-    FVector GetMuzzleLocation() const;
-
-
-    /** Weapon Reloading */
-    void Reload();
-    void FinishReloading();
-    int32 AmmoToReload();
-	virtual void ReloadAmmo(int32 Ammo) {};
-
 
     /** Ammo and Damage */
     void SetAmmoInMag();
@@ -75,20 +61,32 @@ public:
     virtual int32 GetCurrentAmmoInMag() const { return AmmoInMag; }
     virtual int32 GetMaxAmmoOnHand() const { return MaxAmmoOnHand; }
     virtual int32 GetMagCapacity() const { return MagCapacity; }
-    virtual float GetDamage() const { return 20.f; }
+
+    // Ammo Setters
+    virtual void ReloadAmmo(int32 AmmoToAdd)
+    {
+        int32 AmmoToReload = FMath::Min(AmmoToAdd, MagCapacity - AmmoInMag);
+        AmmoInMag += AmmoToReload;
+        AmmoOnHand -= AmmoToReload;
+    }
+
+    virtual float GetDamage() const { return Damage; }
     void DealDamage(const FHitResult& HitResult);
 
     /** Utilities */
     bool WeaponIsEmpty() const;
-    bool ShouldSwapWeapons() const;
 	// Useful for accessing the actual mesh of the weapon itself
 	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh() const {return WeaponMesh;}
-	void SetAiming(bool bIsAiming);
-	void InitializeCharacterAndController();
     void SetWeaponState(EWeaponState NewState);
+    EWeaponType GetWeaponType() const {return WeaponType;}
     EWeaponState GetWeaponState() const { return WeaponState; }
-
-
+    virtual void SetOwner(AActor* NewOwner) override;
+    UParticleSystem* GetTracer() const { return Tracer; }
+    UParticleSystem* GetImpactParticles() const { return ImpactParticles; }
+    USoundCue* GetImpactSound() const { return ImpactSound; }
+    
+    FORCEINLINE float GetZoomedFOV() const { return ZoomedFOV; }
+    FORCEINLINE float GetZoomInterpSpeed() const {return ZoomInterpSpeed;}
 
 
     /** Replication */
@@ -101,18 +99,14 @@ public:
     UFUNCTION()
     void OnRep_WeaponState();
 
-    /** Server Functions */
-    UFUNCTION(Server, Reliable)
-    void ServerSetAiming(bool bIsAiming);
-    UFUNCTION(Server, Reliable)
-    void ServerReload();
+
+
+
 
 protected:
 
     /** Lifecycle */
     virtual void BeginPlay() override;
-
-    virtual void HandleFire(const FVector& HitTarget, const FVector& MuzzleLocation);
 
     /** Overlap Events */
     UFUNCTION()
@@ -130,18 +124,33 @@ protected:
     UPROPERTY(EditAnywhere)
 	UParticleSystem* MuzzleFlash;
 
+    UPROPERTY(EditAnywhere)
+	float Damage;
+
+
+
+
 
 private:
 
     /** Core Components */
     UPROPERTY(VisibleAnywhere, Category = Weapon)
-    USphereComponent* AreaSphere;
+    class USphereComponent* AreaSphere;
 
     UPROPERTY(VisibleAnywhere, Category = Weapon)
-    UWidgetComponent* PickupWidget;
-
+    class UWidgetComponent* PickupWidget;
+    
     UPROPERTY(BlueprintReadWrite, VisibleAnywhere, Category = Weapon, meta = (AllowPrivateAccess = "true"))
     USkeletalMeshComponent* WeaponMesh;
+
+    UPROPERTY(EditAnywhere, Category = Projectile)
+    class UParticleSystem* Tracer;
+
+    UPROPERTY(EditAnywhere, Category = Projectile)
+    class UParticleSystem* ImpactParticles;
+
+    UPROPERTY(EditAnywhere)
+    USoundCue* ImpactSound;
 
     /** Animation */
     UPROPERTY(EditAnywhere, Category = WeaponAnimation)
@@ -150,11 +159,6 @@ private:
     /** Player and Character References */
     UPROPERTY()
     class AMainCharacter* MainCharacter; // Access to MainCharacter functions.
-
-
-    /** Replicated States */
-    UPROPERTY(Replicated)
-    bool bAiming;
 
     UPROPERTY(ReplicatedUsing = OnRep_AmmoOnHand)
     int32 AmmoOnHand; // Current ammo available for the weapon.
@@ -172,26 +176,23 @@ private:
     UPROPERTY()
     int32 MagCapacity; // Maximum magazine capacity.
 
-
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "Combat", meta = (AllowPrivateAccess = "true")) 
+    EWeaponType WeaponType;
 
     UPROPERTY(ReplicatedUsing = OnRep_WeaponState)
     EWeaponState WeaponState = EWeaponState::EWS_Unequipped;
 
-    /** Other Utility Variables */
-    bool bReloading; // Indicates if the weapon is reloading.
-    bool bFireButtonPressed;
-    bool bCanFire = true; // True when the weapon can fire.
-
     /** Casing and Effects */
     UPROPERTY(EditAnywhere, Category = Casing)
-    TSubclassOf<class ACasing> Casing; // Ejectable shell casing class.
+    TSubclassOf<class ACasing> Casing; // Ejectable shell casing class
 
-    /** Timer Handles */
-    FTimerHandle ReloadTimerHandle;
+    UPROPERTY(EditAnywhere, Category = "Combat")
+    float ZoomedFOV = 35.0f; // will change based on weapon
 
-    UPROPERTY(EditAnywhere)
-	float Damage;
+    UPROPERTY(EditAnywhere, Category = "Combat")
+    float ZoomInterpSpeed = 15.0f; // will change based on weapon
 
 
-	
+
+
 };

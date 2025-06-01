@@ -11,6 +11,7 @@
 #include "Weapon.h"
 #include "MyHUD.h"
 #include "HealthPickUp.h"
+#include "combatComponent.h"
 #include "AmmoPickUp.h"
 #include "MyPlayerController.h"
 #include "Animation/AnimInstance.h" 
@@ -18,25 +19,23 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "Weapon.h"
 
-// #include "CombatComponent.h"
 // redo initializer list
 AMainCharacter::AMainCharacter()
-    : CameraBoom(CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom")))
-    , FollowCamera(CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera")))
-    , Combat(CreateDefaultSubobject<UCombatComponent>(TEXT("CombatComponent")))
-    , OverlappingWeapon(nullptr)
-    , FireMontage(nullptr)
-    , ReloadMontage(nullptr)
-    , AO_Yaw(0.f)
-    , AO_Pitch(0.f)
-    , InterpAO_Yaw(0.f)
-    , TurningInPlace(ETurningInPlace::ETIP_NotTurning)
-    , PlayerHealth(100.f)
-    , MaxHealth(100.f)
-    , OverlappingItem(nullptr)
-    , pickUpHealth(nullptr)
-    , MyPlayerController(nullptr)
-    , MyGameHUD(nullptr)
+    : CameraBoom(CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"))),
+      FollowCamera(CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"))),
+      OverlappingWeapon(nullptr),
+      PlayerHealth(100.f),
+      FireMontage(nullptr),
+      ReloadMontage(nullptr),
+      MaxHealth(100.f),
+      AO_Yaw(0.f),
+      AO_Pitch(0.f),
+      InterpAO_Yaw(0.f),
+      TurningInPlace(ETurningInPlace::ETIP_NotTurning),
+      OverlappingItem(nullptr),
+      pickUpHealth(nullptr),
+      MyPlayerController(nullptr),
+      MyGameHUD(nullptr)
 {
     PrimaryActorTick.bCanEverTick = true;
 
@@ -54,7 +53,8 @@ AMainCharacter::AMainCharacter()
     GetCharacterMovement()->bOrientRotationToMovement = true; // Character moves in the direction of input
     GetCharacterMovement()->NavAgentProps.bCanCrouch = true; // Enable crouching
 
-    // Combat->SetIsReplicated(true);
+    combatComponent = CreateDefaultSubobject<UCombatComponent>(TEXT("ComponentComponent"));
+
 }
 
 // Called when the game starts or when spawned
@@ -62,7 +62,21 @@ void AMainCharacter::BeginPlay()
 {
     Super::BeginPlay();
 
-    // UE_LOG(LogTemp, Warning, TEXT("BeginPlay: Combat = %s"), Combat ? *Combat->GetName() : TEXT("NULL"));
+    MyPlayerController = Cast<AMyPlayerController>(GetController());
+    if (MyPlayerController)
+    {
+        MyPlayerController->SetHUDHealth(PlayerHealth, MaxHealth);
+
+        MyGameHUD = Cast<AMyHUD>(MyPlayerController->GetHUD());
+        if (MyGameHUD)
+        {
+            MyGameHUD->AddCharacterStats();
+        }
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Failed to initialize MyPlayerController"));
+    }
 
 }
 
@@ -92,6 +106,8 @@ void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	PlayerInputComponent->BindAction("Reload", IE_Released, this, &AMainCharacter::ReloadButtonPressed);
 
 	PlayerInputComponent->BindAction("PickUp", IE_Pressed, this, &AMainCharacter::PickUpButtonPressed);
+    PlayerInputComponent->BindAction("Zoom", IE_Pressed, this, &AMainCharacter::ZoomButtonPressed);
+    PlayerInputComponent->BindAction("Zoom", IE_Released, this, &AMainCharacter::ZoomButtonReleased);
 
 
 
@@ -128,19 +144,21 @@ void AMainCharacter::InitValues()
             MyGameHUD = Cast<AMyHUD>(MyPlayerController->GetHUD());
             if (MyGameHUD)
             {
+                UE_LOG(LogTemp, Warning, TEXT("MyGameHUD is valid"));
                 MyGameHUD->AddCharacterStats();
             }
         }
     }
+
 }
 
 void AMainCharacter::PostInitializeComponents()
 {
 	Super::PostInitializeComponents();
 
-	if (Combat)
+	if (combatComponent)
 	{
-		Combat->MainCharacter = this;
+		combatComponent->MainCharacter = this;
 	}
 }
 
@@ -176,57 +194,48 @@ void AMainCharacter::LookUp(float value)
 }	
 
 void AMainCharacter::EquipButtonPressed()
-{   
+{
+    if(combatComponent)
+    {
+        if(OverlappingWeapon)
+        {
+            if(HasAuthority())
+            {
+                ServerEquipButtonPressed();
+            }
+        }
+        else if(!OverlappingWeapon && combatComponent->ShouldSwapWeapons())// else if no overlapping weapon is valid but equipp
+        {
+            // check where combat component is even being set
+            combatComponent->SwapWeapons();
+        }
+    }
+}
 
-    if (Combat)
+void AMainCharacter::ServerEquipButtonPressed_Implementation()
+{
+    // Directly call the equip logic for the server
+    if (combatComponent)
     {
         if(OverlappingWeapon)
         {
             UE_LOG(LogTemp, Warning, TEXT("Overlapping weapon is valid"));
-            if (HasAuthority())
-            {
-                Combat->EquipWeapon(OverlappingWeapon);
-            }
-            else
-            {
-                ServerEquipButtonPressed();
-            }
+            combatComponent->EquipWeapon(OverlappingWeapon);
 
         }
-        else
+
+        else if(combatComponent->ShouldSwapWeapons())
         {
-            Combat->SwapWeapons();
+            combatComponent->SwapWeapons();
         }
-    }
-    else
-    {
-        UE_LOG(LogTemp, Warning, TEXT("Combat is not valid"));
+
+        UE_LOG(LogTemp, Warning, TEXT("ServerEquip function called"));
     }
 }
-
-
-void AMainCharacter::ServerEquipButtonPressed_Implementation()
-{
-    if (Combat && OverlappingWeapon)
-    {
-        Combat->EquipWeapon(OverlappingWeapon);
-    }
-}
-
-bool AMainCharacter::IsWeaponEquipped() const
-{
-    return Combat && Combat->GetEquippedWeapon() != nullptr;
-}
-
-AWeapon* AMainCharacter::GetEquippedWeapon()
-{
-	if (Combat == nullptr) return nullptr;
-	return Combat->EquippedWeapon;
-}
-
 
 void AMainCharacter::SetOverlappingWeapon(AWeapon* Weapon)
 {
+    // Prevent overlapping with the currently equipped weapon
     if (OverlappingWeapon)
     {
         OverlappingWeapon->ShowPickUpWidget(false);
@@ -250,6 +259,16 @@ void AMainCharacter::OnRep_OverlappingWeapon()
 	{
 		OverlappingWeapon->ShowPickUpWidget(false);
 	}
+}
+
+bool AMainCharacter::IsWeaponEquipped() const
+{
+    return combatComponent && combatComponent->GetEquippedWeapon() != nullptr;
+}
+
+AWeapon* AMainCharacter::GetEquippedWeapon()
+{
+    return combatComponent ? combatComponent->GetEquippedWeapon() : nullptr;
 }
 
 void AMainCharacter::SetOverlappingItem(APickUp* PickUp)
@@ -291,46 +310,68 @@ void AMainCharacter::PickUpButtonPressed()
 
 }
 
-// re-engineer
+void AMainCharacter::ZoomButtonPressed()
+{
+    if (combatComponent)
+    {
+        combatComponent->SetZooming(true); // Trigger zooming
+    }
+}
+
+void AMainCharacter::ZoomButtonReleased()
+{
+    if (combatComponent)
+    {
+        combatComponent->SetZooming(false); // Stop zooming
+    }
+}
+
 void AMainCharacter::FireButtonPressed()
 {
-	if(Combat)
+	if(combatComponent)
 	{
-		Combat->FireButtonPressed(true);
+		combatComponent->FireButtonPressed(true);
 	}
 
 }
 
-// re-engineer
 void AMainCharacter::FireButtonReleased()
 {
-	if(Combat)
+	if(combatComponent)
 	{
-		Combat->FireButtonPressed(false);
+		combatComponent->FireButtonPressed(false);
 	}
 }
 
 void AMainCharacter::ReloadButtonPressed()
 {
-
-
+    if(combatComponent)
+	{
+		combatComponent->Reload();
+	}
 }
 
 void AMainCharacter::AimButtonPressed()
 {	
+    if(combatComponent)
+    {
+        combatComponent->SetAiming(true);
+    }
 
 }
 
 
 void AMainCharacter::AimButtonReleased()
 {
-
+    if(combatComponent)
+    {
+        combatComponent->SetAiming(false);
+    }
 }
 
 bool AMainCharacter::IsAiming() const
 {
-
-    return false;
+    return (combatComponent && combatComponent->bAiming);
 }
 
 bool AMainCharacter::IsReloading() const
@@ -362,7 +403,7 @@ void AMainCharacter::PlayReloadMontage()
 		AnimInstance->Montage_Play(ReloadMontage);
 		FName SectionName;
 
-        EWeaponType WeaponType = Combat->GetWeaponType();
+        EWeaponType WeaponType = GetEquippedWeapon()->GetWeaponType();
         switch (WeaponType)
         {
             case EWeaponType::EWT_AssaultRifle:
@@ -465,16 +506,15 @@ void AMainCharacter::OnRep_Health()
 
 ECombatState AMainCharacter::GetCharacterCombatState() const
 {
-	// if (Combat == nullptr) 
-    return ECombatState::ECS_MAX;
-	// return Combat->GetCombatState(); 
+	if (combatComponent == nullptr) return ECombatState::ECS_MAX;
+	return combatComponent->GetCombatState();
 }
 
 
 FVector AMainCharacter::GetHitTarget() const
 {
-	// if(Combat == nullptr)
+	// if(combatComponent == nullptr)
      return FVector();
-	// return Combat->GetLocalHitTarget();
+	// return combatComponent->GetLocalHitTarget();
 }
 

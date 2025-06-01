@@ -16,6 +16,10 @@ void UMyAnimInstance::NativeInitializeAnimation()
     if (Pawn)
     {
         MainCharacter = Cast<AMainCharacter>(Pawn);
+        if (MainCharacter)
+        {
+            playerWeapon = MainCharacter->GetEquippedWeapon();
+        }
     }
 }
 void UMyAnimInstance::NativeUpdateAnimation(float DeltaTime)
@@ -32,8 +36,8 @@ void UMyAnimInstance::NativeUpdateAnimation(float DeltaTime)
         if (!MainCharacter) return;
     }
 
-    // // Get the equipped weapon
-    // playerWeapon = MainCharacter->GetEquippedWeapon();
+    // Get the equipped weapon
+    playerWeapon = MainCharacter->GetEquippedWeapon();
     
     // Continue updates if MainCharacter is valid
     UpdateMovementProperties();
@@ -54,7 +58,8 @@ void UMyAnimInstance::UpdateMovementProperties()
 
 void UMyAnimInstance::UpdateCharacterProperties(float DeltaTime)
 {
-    bWeaponEquipped = (playerWeapon != nullptr);
+    bWeaponEquipped = MainCharacter->IsWeaponEquipped();
+    playerWeapon = MainCharacter->GetEquippedWeapon();
     bIsCrouched = MainCharacter->bIsCrouched;
     bAiming = MainCharacter->IsAiming();
     TurningInPlace = MainCharacter->GetTurningInPlace();

@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "MainMenuWidget.h"
+#include "GameModeSelectionMenuWidget.h"
 #include "MultiplayerSessions.h"
 #include "OnlineSessionSettings.h"
 #include "MultiplayerMenuWidget.generated.h"
@@ -13,60 +13,29 @@
  */
 
 
-
+// this class should be child of gamemode selection and gamemode selection shou
 UCLASS()
-class MYZOMBIES_API UMultiplayerMenuWidget : public UMainMenuWidget
+class MYZOMBIES_API UMultiplayerMenuWidget : public UGameModeSelectionMenuWidget
 {
 	GENERATED_BODY()
 
 public:
 
-
     virtual void NativeConstruct() override;
 
     virtual void MenuSetup();
-  
+
     void BindButtonEvents();
-
+  
     UFUNCTION()
-    void OnHostButtonClicked();
-
-    UFUNCTION()
-    void OnJoinButtonClicked();
-
-    UFUNCTION() 
     void OnBackButtonClicked();
-
-    UFUNCTION()
-    void OnCreateSession(bool bWasSuccessful);
-
-    void OnFindSessions(const TArray<FOnlineSessionSearchResult>& SessionResults, bool bWasSuccessful);
-
-	void OnJoinSession(EOnJoinSessionCompleteResult::Type Result);
-
-	UFUNCTION()
-	void OnDestroySession(bool bWasSuccessful);
-
-	UFUNCTION()
-	void OnStartSession(bool bWasSuccessful);
 
 protected:
 
 
-
 	
 private:
-
-    // create pointer to OnlinePlugin class to access necessary funtion
+   
     UPROPERTY(meta = (BindWidget))
-    class UButton* HostButton;
-
-    UPROPERTY(meta = (BindWidget))
-    class UButton* JoinButton;
-
-    UPROPERTY(meta = (BindWidget))
-    class UButton* BackButton;
-
-    class UMultiplayerSessions* multiplayerSessionPtr; // pointer to custom mutliplayer plugin class
-
+    UButton* MultiplayerBackButton;
 };

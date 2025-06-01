@@ -49,6 +49,18 @@ public:
         return SoloMenuWidgetClass;
     }
 
+    // Const getter for child classes to access
+    const TSubclassOf<UUserWidget>& GetGameModeSelectionMenuWidgetClass() const
+    {
+        return gameModeSelectionMenuWidgetClass;
+    }
+
+    // // Const getter for child classes to access
+    // const TSubclassOf<UUserWidget>& GetLobbyMenuWidgetClass() const
+    // {
+    //     return lobbyMenuWidgetClass;
+    // }
+
 protected: 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Widgets")
     TMap<FName, UUserWidget*> menuWidgetMap;  // A map that stores widget instances
@@ -66,6 +78,10 @@ private:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Widgets", meta = (AllowPrivateAccess = "true"))
     TSubclassOf<UUserWidget> mainMenuWidgetClass;
 
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Widgets", meta = (AllowPrivateAccess = "true"))
+    TSubclassOf<UUserWidget> gameModeSelectionMenuWidgetClass;
+
+    
 
 
 };
